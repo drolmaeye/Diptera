@@ -3,7 +3,7 @@ __author__ = 'j.smith'
 '''
 A GUI for creating, reading, and graphing flyscan (1d or 2d) files
 
-Devel version test for github!! 2 August 2015
+Devel version test for github!! 2 August 2015 devel
 '''
 
 # import necessary modules
