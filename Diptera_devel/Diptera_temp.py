@@ -3,7 +3,7 @@ __author__ = 'j.smith'
 '''
 A GUI for creating, reading, and graphing flyscan (1d or 2d) files
 
-Devel version test for github!! 2 August 2015 devel
+Devel version test for github!! 2 August 2015
 '''
 
 # import necessary modules
@@ -304,6 +304,8 @@ class ScanActions:
             invalid_entry()
 
     def start_scan(self):
+        pass
+        '''
         # ###make this a static method###
         # clear plot, position info and set dimension
         while step_axis.scan_directory.get() == 'Select directory before scan':
@@ -511,6 +513,7 @@ class ScanActions:
             data.current_slice.set(1)
             data.slice_flag.set(1)
             update_plot()
+        '''
 
 
 class Counters:
@@ -530,6 +533,10 @@ class Counters:
         self.scale.set(1.0)
         self.data_type_list = ['Counts', 'Derivative']
         self.data_type.set(self.data_type_list[0])
+        self.max_scale = IntVar()
+        self.min_scale = IntVar()
+        self.max_scale.set(100)
+        self.min_scale.set(0)
 
         # setup trace on relevant values
         self.ref_flag.trace('w', update_plot)
@@ -566,8 +573,17 @@ class Counters:
         self.entry_scale.bind('<Return>', self.scale_validate)
         self.entry_data_type = OptionMenu(self.frame, self.data_type, *self.data_type_list)
         self.entry_data_type.grid(row=1, rowspan=2, column=5, padx=0)
-        self.button_update = Button(self.frame, text='Update plot', command=update_plot)
-        self.button_update.grid(row=1, rowspan=2, column=6, padx=0)
+        #  self.button_update = Button(self.frame, text='Update plot', command=update_plot)
+        # self.button_update.grid(row=1, rowspan=2, column=6, padx=0)
+        self.entry_max_scale = Entry(self.frame, textvariable=self.max_scale, width=5)
+        self.entry_max_scale.grid(row=1, column=6)
+        self.entry_max_scale.bind('<FocusOut>', self.max_scale_validate)
+        self.entry_max_scale.bind('<Return>', self.max_scale_validate)
+        self.entry_min_scale = Entry(self.frame, textvariable=self.min_scale, width=5)
+        self.entry_min_scale.grid(row=2, column=6)
+        self.entry_min_scale.bind('<FocusOut>', self.min_scale_validate)
+        self.entry_min_scale.bind('<Return>', self.min_scale_validate)
+
 
     def scale_validate(self, event):
         # allow negative numbers for now
@@ -577,6 +593,34 @@ class Counters:
             update_plot()
         except ValueError:
             self.scale.set(1.0)
+            update_plot()
+            invalid_entry()
+
+    def max_scale_validate(self, event):
+        # allow negative numbers for now
+        try:
+            val = self.max_scale.get()
+            isinstance(val, int)
+            if self.min_scale.get() < val <= 100:
+                update_plot()
+            else:
+                raise ValueError
+        except ValueError:
+            self.max_scale.set(100)
+            update_plot()
+            invalid_entry()
+
+    def min_scale_validate(self, event):
+        # allow negative numbers for now
+        try:
+            val = self.min_scale.get()
+            isinstance(val, int)
+            if 0 <= val < self.max_scale.get():
+                update_plot()
+            else:
+                raise ValueError
+        except ValueError:
+            self.min_scale.set(0)
             update_plot()
             invalid_entry()
 
@@ -1286,7 +1330,16 @@ def update_plot(*args):
             plt.plot(core.FLY, core.SCA, marker='.', ls='-')
     else:
         plt.ylabel('Step axis:  ' + step_axis.axis.get())
-        plt.contourf(core.FLY, core.STP, core.SCA, 64)
+        # test intensity scaling
+        # area_min = np.amin(core.SCA)
+        # area_max = np.amax(core.SCA)
+        # area_range = area_max - area_min
+        # cf_min = area_min + area_range*counter.min_scale.get()*0.01
+        # cf_max = area_min + area_range*counter.max_scale.get()*0.01
+        # V = np.linspace(cf_min, cf_max, 65)
+        N = counter.max_scale.get()
+        plt.contourf(core.FLY, core.STP, core.SCA, N)
+        # plt.contourf(core.FLY, core.STP, core.SCA, 64)
         plt.colorbar()
         halfx = (plt.xlim()[1] + plt.xlim()[0])/2
         halfy = (plt.ylim()[1] + plt.ylim()[0])/2
