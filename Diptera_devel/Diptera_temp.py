@@ -47,6 +47,9 @@ class CoreData:
         self.dvls = []
         # define dimension and specify default
         self.dimension = 11
+        # plot flag that cannot be turned off (for now)
+        self.plot_flag = IntVar()
+        self.plot_flag.set(1)
 
 
 class ScanBox:
@@ -1037,6 +1040,158 @@ class DataLoad:
         else:
             pass
 
+class Overlay:
+    def __init__(self, master, label):
+        self.frame = Frame(master)
+        self.frame.pack()
+
+        # define instance variables and set defaults
+        self.plot_flag = IntVar()
+        self.overlay_file = StringVar()
+        self.overlay_slice = IntVar()
+        self.overlay_slice.set(1)
+
+        # create default/dummy arrays
+        self.FLY = np.linspace(-0.045, 0.045, 10)
+        self.STP = np.linspace(-0.05, 0.05, 11)
+        self.TIM = np.ones((11, 10))
+        self.FOE = np.ones((11, 10))
+        self.REF = np.ones((11, 10))
+        self.RMD = np.ones((11, 10))
+        self.BSD = np.ones((11, 10))
+        self.SCA = np.ones((11, 10))
+        self.dimension = 11
+
+        # Make headings
+        if label == 'over1':
+            self.head_label = Label(self.frame, text='OVERLAY CONTROL')
+            self.head_label.grid(row=0, column=0, columnspan=2, pady=5, sticky='W')
+            self.head_slice = Label(self.frame, text='Current Slice')
+            self.head_slice.grid(row=0, column=2, columnspan=3)
+
+        # make and place widgets
+        self.cbox_plot_flag = Checkbutton(self.frame,
+                                             variable=self.plot_flag,
+                                             command=self.activate_overlay)
+        self.cbox_plot_flag.grid(row=1, column=0, pady=5)
+        self.label_overlay_file = Label(self.frame, textvariable=self.overlay_file,
+                                        width=40, relief=SUNKEN, anchor='w')
+        self.label_overlay_file.grid(row=1, column=1, columnspan=1, padx=5, pady=5)
+        self.button_downslice = Button(self.frame, text='<', command=self.decrement_slice)
+        self.button_downslice.grid(row=1, column=2, sticky='W')
+        self.display_overlay_slice = Label(self.frame, textvariable=self.overlay_slice, width=4, relief=SUNKEN)
+        self.display_overlay_slice.grid(row=1, column=3, padx=5)
+        self.button_upslice = Button(self.frame, text='>', command=self.increment_slice)
+        self.button_upslice.grid(row=1, column=4, sticky='E')
+        self.button_overlay_file = Button(self.frame, text='Load Data', command=self.load_overlay, width=11)
+        self.button_overlay_file.grid(row=1, column=6, padx=5, pady=5)
+        self.button_overlay_grab = Button(self.frame, text='Grab Data', command=self.grab_data, width=11)
+        self.button_overlay_grab.grid(row=1, column=7, padx=5, pady=5)
+
+    def activate_overlay(self):
+        update_plot()
+
+    def decrement_slice(self):
+        old_slice = self.overlay_slice.get()
+        new_slice = old_slice - 1
+        if new_slice > 0 and self.plot_flag.get():
+            self.overlay_slice.set(new_slice)
+            update_plot()
+        else:
+            pass
+
+    def increment_slice(self):
+        old_slice = self.overlay_slice.get()
+        new_slice = old_slice + 1
+        if new_slice <= self.dimension and self.plot_flag.get():
+            self.overlay_slice.set(new_slice)
+            update_plot()
+        else:
+            pass
+
+    def load_overlay(self):
+        old_data = self.overlay_file.get()
+        if not old_data == '':
+            old_dir = os.path.dirname(old_data)
+            if os.path.exists(old_dir):
+                data_file = askopenfilename(initialdir=old_dir)
+            else:
+                data_file = askopenfilename()
+        else:
+            old_data = data.current_file.get()
+            if not old_data == '':
+                old_dir = os.path.dirname(old_data)
+                if os.path.exists(old_dir):
+                    data_file = askopenfilename(initialdir=old_dir)
+                else:
+                    data_file = askopenfilename()
+            else:
+                data_file = askopenfilename()
+        try:
+            if os.path.isfile(data_file):
+                cdata = np.load(data_file)
+            else:
+                raise IOError
+        except IOError:
+            path_warn()
+            return
+        dimension = cdata['dim'][()]
+        # h_active = cdata['h_act'][()]
+        # v_active = cdata['v_act'][()]
+        # hax.active_stage.set(h_active)
+        # vax.active_stage.set(v_active)
+        self.FLY = cdata['fly']
+        self.STP = cdata['stp']
+        self.TIM = cdata['tim']
+        self.FOE = cdata['foe']
+        self.REF = cdata['ref']
+        self.RMD = cdata['rmd']
+        self.BSD = cdata['bsd']
+        self.overlay_file.set(data_file)
+        self.dimension = dimension
+        if self.dimension > 1:
+            o_slice = divmod(self.dimension, 2)[0]
+            self.overlay_slice.set(o_slice)
+        else:
+            self.overlay_slice.set(1)
+        cdata.close()
+        self.plot_flag.set(1)
+        update_plot()
+
+    def grab_data(self):
+        primary_data = data.current_file.get()
+        if not primary_data == '':
+            data_file = primary_data
+            try:
+                if os.path.isfile(data_file):
+                    cdata = np.load(data_file)
+                else:
+                    raise IOError
+            except IOError:
+                path_warn()
+                return
+            dimension = cdata['dim'][()]
+            # h_active = cdata['h_act'][()]
+            # v_active = cdata['v_act'][()]
+            # hax.active_stage.set(h_active)
+            # vax.active_stage.set(v_active)
+            self.FLY = cdata['fly']
+            self.STP = cdata['stp']
+            self.TIM = cdata['tim']
+            self.FOE = cdata['foe']
+            self.REF = cdata['ref']
+            self.RMD = cdata['rmd']
+            self.BSD = cdata['bsd']
+            self.overlay_file.set(data_file)
+            self.dimension = dimension
+            primary_slice = data.current_slice.get()
+            self.overlay_slice.set(primary_slice)
+            cdata.close()
+            self.plot_flag.set(1)
+            update_plot()
+        else:
+            showinfo('Empty Dataset', 'There is no data to grab!')
+
 
 class DragHorizontalLines:
     lock = None
@@ -1206,43 +1361,54 @@ def close_quit():
 
 
 def update_plot(*args):
-    # fetch and locally name the arrays selected by the user
-    local_dict = {
-        'Beamstop diode': core.BSD,
-        'Removable diode': core.RMD,
-        'Hutch reference': core.REF,
-        'FOE ion chamber': core.FOE,
-        '50 MHz clock': core.TIM}
-    signal = counter.i_signal.get()
-    reference = counter.i_ref.get()
-    sig_array = local_dict[signal]
-    ref_array = local_dict[reference]
-    # normalize if needed
-    if counter.ref_flag.get():
-        raw_array = np.divide(sig_array, ref_array)
-    else:
-        raw_array = sig_array
-    # create the basic core.SCA for plotting
-    core.SCA = raw_array * counter.scale.get()
-    # calculate derivative here if needed
-    if counter.data_type.get() == 'Derivative':
-        TEMP = np.ones(core.SCA.shape)
-        x_length = len(core.FLY)
-        for steps in range(core.dimension):
-            for x in range(x_length):
-                if x == 0 or x == x_length - 1:
-                    pass
-                else:
-                    dy = core.SCA[steps][x+1] - core.SCA[steps][x-1]
-                    dx = core.FLY[x+1] - core.FLY[x-1]
-                    TEMP[steps][x] = dy/dx
-            TEMP[steps][0] = TEMP[steps][1]
-            TEMP[steps][x_length-1] = TEMP[steps][x_length-2]
-        core.SCA = TEMP
+    # create a list for iteration
+    array_list = [core, over1, over2, over3]
+    for each in array_list:
+        if each.plot_flag.get():
+            # fetch and locally name the arrays selected by the user
+            local_dict = {
+                'Beamstop diode': each.BSD,
+                'Removable diode': each.RMD,
+                'Hutch reference': each.REF,
+                'FOE ion chamber': each.FOE,
+                '50 MHz clock': each.TIM}
+            signal = counter.i_signal.get()
+            reference = counter.i_ref.get()
+            sig_array = local_dict[signal]
+            ref_array = local_dict[reference]
+            # normalize if needed
+            if counter.ref_flag.get():
+                raw_array = np.divide(sig_array, ref_array)
+            else:
+                raw_array = sig_array
+            # create the basic core.SCA for plotting
+            each.SCA = raw_array * counter.scale.get()
+            # calculate derivative here if needed
+            if counter.data_type.get() == 'Derivative':
+                TEMP = np.ones(each.SCA.shape)
+                x_length = len(each.FLY)
+                for steps in range(each.dimension):
+                    for x in range(x_length):
+                        if x == 0 or x == x_length - 1:
+                            pass
+                        else:
+                            dy = each.SCA[steps][x+1] - each.SCA[steps][x-1]
+                            dx = each.FLY[x+1] - each.FLY[x-1]
+                            TEMP[steps][x] = dy/dx
+                    TEMP[steps][0] = TEMP[steps][1]
+                    TEMP[steps][x_length-1] = TEMP[steps][x_length-2]
+                each.SCA = TEMP
     # select, if necessary, the indicated slice of core.SCA
     if data.slice_flag.get() and core.dimension > 1:
-        index = data.current_slice.get() -1
+        index = data.current_slice.get() - 1
         core.SCA = core.SCA[index]
+        for each in array_list:
+            if each == core:
+                pass
+            else:
+                if each.plot_flag.get():
+                    index = each.overlay_slice.get() - 1
+                    each.SCA = each.SCA[index]
     # clear fields and plot
     hax.min_pos.set('')
     hax.mid_pos.set('')
@@ -1257,8 +1423,12 @@ def update_plot(*args):
     plt.xlabel('Fly axis:  ' + fly_axis.axis.get())
     if core.dimension == 1 or data.slice_flag.get():
         plt.ylabel('Intensity')
-        shp = core.FLY.shape
-        core.SCA.shape = shp
+        for each in array_list:
+            if each.plot_flag.get():
+                shp = each.FLY.shape
+                #print shp
+                #print each.SCA.shape
+                each.SCA.shape = shp
         # set up Arun bars (draggable horizontal and vertical lines)
         f_min = np.amin(core.SCA)
         f_max = np.amax(core.SCA)
@@ -1324,10 +1494,12 @@ def update_plot(*args):
         fly_axis_length = core.FLY.shape[0]
         image_index = yind*fly_axis_length + xind + 1
         data.index.set(image_index)
-        if counter.data_type.get() == 'Derivative':
-            plt.plot(core.FLY[1:-1], core.SCA[1:-1], marker='.', ls='-')
-        else:
-            plt.plot(core.FLY, core.SCA, marker='.', ls='-')
+        for each in array_list:
+            if each.plot_flag.get():
+                if counter.data_type.get() == 'Derivative':
+                    plt.plot(each.FLY[1:-1], each.SCA[1:-1], marker='.', ls='-')
+                else:
+                    plt.plot(each.FLY, each.SCA, marker='.', ls='-')
     else:
         plt.ylabel('Step axis:  ' + step_axis.axis.get())
         # test intensity scaling
@@ -1425,6 +1597,8 @@ framePosition = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
 framePosition.grid(row=4, column=1, sticky='ew')
 frameFiles = Frame(root, width=652, height=123, bd=5, relief=RIDGE, padx=10, pady=5)
 frameFiles.grid(row=4, column=0, sticky='nsew')
+frameOverlays = Frame(root, bd=5, relief=RIDGE, padx=10, pady=5)
+frameOverlays.grid(row=5, column=0)
 
 # make a drawing area
 fig = plt.figure(figsize=(8, 6))
@@ -1438,6 +1612,7 @@ quit_button.grid(row=1, column=0, sticky='s')
 # initialize core data
 core = CoreData()
 
+
 # collections of objects to put in frames above
 fly_axis = ScanBox(frameScanBox, label='Fly axis')
 step_axis = ScanBox(frameScanBox, label='Step axis')
@@ -1448,6 +1623,9 @@ center = Centering(frameCentering)
 hax = Position(framePosition, label='Horizontal axis')
 vax = Position(framePosition, label='Vertical axis')
 data = DataLoad(frameFiles)
+over1 = Overlay(frameOverlays, label='over1')
+over2 = Overlay(frameOverlays, label='over2')
+over3 = Overlay(frameOverlays, label='over3')
 
 # temporary!!!!
 cid = fig.canvas.mpl_connect('button_press_event', onclick)
