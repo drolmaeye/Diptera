@@ -11,6 +11,7 @@ from Tkinter import *
 from ttk import Combobox
 from tkMessageBox import *
 from tkFileDialog import *
+import tkFont
 import os.path
 from epics import *
 from epics.devices import Struck
@@ -224,7 +225,6 @@ class ScanBox:
             name = step_axis.mCustom.description
             self.axis.set(name)
 
-
     def min_validate(self, event):
         try:
             val = self.rel_min.get()
@@ -269,7 +269,6 @@ class ScanBox:
             invalid_entry()
 
 
-
 class ScanActions:
     def __init__(self, master):
         self.frame = Frame(master)
@@ -308,7 +307,7 @@ class ScanActions:
 
     def start_scan(self):
         pass
-        '''
+        action.abort.set(0)
         # ###make this a static method###
         # clear plot, position info and set dimension
         while step_axis.scan_directory.get() == 'Select directory before scan':
@@ -405,6 +404,25 @@ class ScanActions:
         abs_fly_max = mFly_ipos + fly_axis.rel_max.get()
         fly_zero = abs_fly_min - temp_velo * mW.ACCL * 1.5
         fly_final = abs_fly_max + temp_velo * mW.ACCL * 1.5
+        # limit check
+        step_zero = mStep_ipos + step_axis.rel_min.get()
+        step_final = mStep_ipos + step_axis.rel_max.get()
+        fll = mFly.within_limits(fly_zero)
+        fhl = mFly.within_limits(fly_final)
+        sll = mStep.within_limits(step_zero)
+        shl = mStep.within_limits(step_final)
+        limit_check = False
+        if not step_axis.flag.get():
+            if fll and fhl:
+                limit_check = True
+        else:
+            if fll and fhl and sll and shl:
+                limit_check = True
+        if limit_check:
+            pass
+        else:
+            showwarning('Limit Check Failed', 'One or more stage target(s) exceed limits')
+            return
         # set up pco
         mFlypco.put('PositionCompareMode', 1, wait=True)
         mFlypco.put('PositionComparePulseWidth', 1, wait=True)
@@ -419,9 +437,16 @@ class ScanActions:
         mFlypco.PositionCompareStepSize = fly_axis.step_size.get()
         for steps in range(step_npts):
             if step_npts != 1:
-                step_rel = step_axis.rel_min.get() + steps * step_axis.step_size.get()
-                step_abs = mStep_ipos + step_rel
-                mStep.move(step_abs, wait=True)
+                if not action.abort.get():
+                    step_rel = step_axis.rel_min.get() + steps * step_axis.step_size.get()
+                    step_abs = mStep_ipos + step_rel
+                    mStep.move(step_abs, wait=True)
+                else:
+                    mFlypco.put('PositionCompareMode', 0, wait=True)
+                    mFly.move(mFly_ipos, wait=True)
+                    mStep.move(mStep_ipos, wait=True)
+                    showwarning('Acquisition aborted', '2D scan aborted,\nNo data saved,\nStages returnd to initial positions')
+                    return
             mFly.move(fly_zero, wait=True)
             time.sleep(.25)
             mFly.VELO = temp_velo
@@ -516,7 +541,6 @@ class ScanActions:
             data.current_slice.set(1)
             data.slice_flag.set(1)
             update_plot()
-        '''
 
 
 class Counters:
@@ -538,8 +562,10 @@ class Counters:
         self.data_type.set(self.data_type_list[0])
         self.max_scale = IntVar()
         self.min_scale = IntVar()
+        self.levels = IntVar()
         self.max_scale.set(100)
         self.min_scale.set(0)
+        self.levels.set(64)
 
         # setup trace on relevant values
         self.ref_flag.trace('w', update_plot)
@@ -586,7 +612,10 @@ class Counters:
         self.entry_min_scale.grid(row=2, column=6)
         self.entry_min_scale.bind('<FocusOut>', self.min_scale_validate)
         self.entry_min_scale.bind('<Return>', self.min_scale_validate)
-
+        self.entry_levels = Entry(self.frame, textvariable=self.levels, width=5)
+        self.entry_levels.grid(row=1, rowspan=2, column=7)
+        self.entry_levels.bind('<FocusOut>', self.levels_validate)
+        self.entry_levels.bind('<Return>', self.levels_validate)
 
     def scale_validate(self, event):
         # allow negative numbers for now
@@ -600,7 +629,6 @@ class Counters:
             invalid_entry()
 
     def max_scale_validate(self, event):
-        # allow negative numbers for now
         try:
             val = self.max_scale.get()
             isinstance(val, int)
@@ -614,7 +642,6 @@ class Counters:
             invalid_entry()
 
     def min_scale_validate(self, event):
-        # allow negative numbers for now
         try:
             val = self.min_scale.get()
             isinstance(val, int)
@@ -624,6 +651,19 @@ class Counters:
                 raise ValueError
         except ValueError:
             self.min_scale.set(0)
+            update_plot()
+            invalid_entry()
+
+    def levels_validate(self, event):
+        try:
+            val = self.levels.get()
+            isinstance(val, int)
+            if 4 <= val < 128:
+                update_plot()
+            else:
+                raise ValueError
+        except ValueError:
+            self.levels.set(64)
             update_plot()
             invalid_entry()
 
@@ -897,6 +937,46 @@ class Position:
             mH.move(val, wait=True)
         else:
             return
+
+
+class Actions:
+    """
+    Big buttons that initiate data collection
+    """
+
+    def __init__(self, master):
+        """
+        :param master: frame for inserting widgets
+        """
+        self.frame = Frame(master, padx=10, pady=5)
+        self.frame.pack()
+
+        # define variables
+        self.abort = IntVar()
+        self.abort.set(0)
+
+        # make big font
+        bigfont = tkFont.Font(size=10, weight='bold')
+
+        # make and place widgets
+        self.button_abort = Button(self.frame, text='Abort',
+                                   foreground='red', height=2, width=15,
+                                   font=bigfont, command=self.abort)
+        self.button_abort.grid(row=0, column=0, padx=5)
+        self.button_staff = Button(self.frame,
+                                   text='Staff',
+                                   height=2, width=15, font=bigfont,
+                                   command=self.open_staff)
+        self.button_staff.grid(row=0, column=1, padx=5)
+        self.quit_button = Button(self.frame, text='Quit', height=2, width=15,
+                                  font=bigfont, command=close_quit)
+        self.quit_button.grid(row=0, column=2, padx=5)
+
+    def abort(self):
+        action.abort.set(1)
+
+    def open_staff(self):
+        pass
 
 
 class DataLoad:
@@ -1508,7 +1588,8 @@ def update_plot(*args):
         area_range = area_max - area_min
         cf_min = area_min + area_range*counter.min_scale.get()*0.01
         cf_max = area_min + area_range*counter.max_scale.get()*0.01
-        V = np.linspace(cf_min, cf_max, 65)
+        levels = counter.levels.get() + 1
+        V = np.linspace(cf_min, cf_max, levels)
         # N = counter.max_scale.get()
         plt.contourf(core.FLY, core.STP, core.SCA, V)
         # plt.contourf(core.FLY, core.STP, core.SCA, 64)
@@ -1595,6 +1676,8 @@ frameCentering = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
 frameCentering.grid(row=3, column=1, sticky='ew')
 framePosition = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
 framePosition.grid(row=4, column=1, sticky='ew')
+frameActions = Frame(root, bd=5, relief=RIDGE, padx=10, pady=10)
+frameActions.grid(row=5, column=1)
 frameFiles = Frame(root, width=652, height=123, bd=5, relief=RIDGE, padx=10, pady=5)
 frameFiles.grid(row=4, column=0, sticky='nsew')
 frameOverlays = Frame(root, bd=5, relief=RIDGE, padx=10, pady=5)
@@ -1622,6 +1705,7 @@ image = Images(frameImages)
 center = Centering(frameCentering)
 hax = Position(framePosition, label='Horizontal axis')
 vax = Position(framePosition, label='Vertical axis')
+action = Actions(frameActions)
 data = DataLoad(frameFiles)
 over1 = Overlay(frameOverlays, label='over1')
 over2 = Overlay(frameOverlays, label='over2')
