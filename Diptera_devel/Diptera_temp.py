@@ -8,7 +8,6 @@ Devel version test for github!! 2 August 2015
 
 # import necessary modules
 from Tkinter import *
-from ttk import Combobox
 from tkMessageBox import *
 from tkFileDialog import *
 import tkFont
@@ -16,7 +15,9 @@ import os.path
 from epics import *
 from epics.devices import Struck
 import numpy as np
-from math import cos, sin, radians
+from math import cos, sin, radians, pi, sqrt
+from scipy import exp
+from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 
@@ -976,7 +977,7 @@ class Actions:
         action.abort.set(1)
 
     def open_staff(self):
-        pass
+        staff.popup.deiconify()
 
 
 class DataLoad:
@@ -1272,6 +1273,68 @@ class Overlay:
         else:
             showinfo('Empty Dataset', 'There is no data to grab!')
 
+class Staff:
+    def __init__(self, master):
+        self.popup = Toplevel(master)
+        self.popup.title('Extended capabilities during alignment')
+
+        self.frame = Frame(self.popup)
+        self.frame.pack()
+
+        # define instance variables and set defaults
+        self.focus_flag = IntVar()
+        self.pv_a = DoubleVar()
+        self.pv_x0 = DoubleVar()
+        self.pv_mul = DoubleVar()
+        self.pv_mur = DoubleVar()
+        self.pv_wl = DoubleVar()
+        self.pv_wr = DoubleVar()
+
+        # define and place widgets
+        self.cbox_focus_flag = Checkbutton(self.frame, text='Focus fit',
+                                           variable=self.focus_flag, command=update_plot)
+        self.cbox_focus_flag.grid(row=1, rowspan=2, column=0, padx=5, pady=5)
+        self.label_pv_a = Label(self.frame, textvariable=self.pv_a, width=7)
+        self.label_pv_a.grid(row=1, rowspan=2, column=1, padx=5, pady=5)
+        self.label_pv_x0 = Label(self.frame, textvariable=self.pv_x0, width=7)
+        self.label_pv_x0.grid(row=1, rowspan=2, column=2, padx=5, pady=5)
+        self.label_pv_mul = Label(self.frame, textvariable=self.pv_mul, width=7)
+        self.label_pv_mul.grid(row=1, column=3, padx=5, pady=5)
+        self.label_pv_mur = Label(self.frame, textvariable=self.pv_mur, width=7)
+        self.label_pv_mur.grid(row=2, column=3, padx=5, pady=5)
+        self.label_pv_wl = Label(self.frame, textvariable=self.pv_wl, width=7)
+        self.label_pv_wl.grid(row=1, column=4, padx=5, pady=5)
+        self.label_pv_wr = Label(self.frame, textvariable=self.pv_wr, width=7)
+        self.label_pv_wr.grid(row=2, column=4, padx=5, pady=5)
+        self.button_zero_x = Button(self.frame, text='zero x', command=self.zero_x)
+        self.button_zero_x.grid(row=0, column=5, padx=5, pady=5)
+        self.button_zero_y = Button(self.frame, text='zero y', command=self.zero_y)
+        self.button_zero_y.grid(row=1, column=5, padx=5, pady=5)
+        self.button_zero_z = Button(self.frame, text='zero z', command=self.zero_z)
+        self.button_zero_z.grid(row=2, column=5, padx=5, pady=5)
+
+        # hide window on startup
+        self.popup.withdraw()
+
+    # Make these three one function using lambdas above to pass argument!!!
+    def zero_x(self):
+        pass
+        # ###mX.SET = 1
+        # ###mX.VAL = 0
+        # ###mX.SET = 0
+
+    def zero_y(self):
+        pass
+        # ###mY.SET = 1
+        # ###mY.VAL = 0
+        # ###mY.SET = 0
+
+    def zero_z(self):
+        pass
+        # ###mZ.SET = 1
+        # ###mZ.VAL = 0
+        # ###mZ.SET = 0
+
 
 class DragHorizontalLines:
     lock = None
@@ -1440,6 +1503,15 @@ def close_quit():
     root.quit()
 
 
+def piecewise_split_pv(x, a, x0, mul, mur, wl, wr):
+    condlist = [x < x0, x >= x0]
+    funclist = [
+            lambda x: a * (mul * (2/pi) * (wl / (4*(x-x0)**2 + wl**2)) + (1 - mul) * (sqrt(4*np.log(2)) / (sqrt(pi) * wl)) * exp(-(4*np.log(2)/wl**2)*(x-x0)**2)),
+            lambda x: a * (mur * (2/pi) * (wr / (4*(x-x0)**2 + wr**2)) + (1 - mur) * (sqrt(4*np.log(2)) / (sqrt(pi) * wr)) * exp(-(4*np.log(2)/wr**2)*(x-x0)**2))]
+    return np.piecewise(x, condlist, funclist)
+
+
+
 def update_plot(*args):
     # create a list for iteration
     array_list = [core, over1, over2, over3]
@@ -1574,10 +1646,28 @@ def update_plot(*args):
         fly_axis_length = core.FLY.shape[0]
         image_index = yind*fly_axis_length + xind + 1
         data.index.set(image_index)
+        if staff.focus_flag.get() and counter.data_type.get() == 'Derivative':
+            x = core.FLY
+            y = core.SCA
+            abs_values = np.abs(core.SCA)
+            print abs_values
+            guess_index = np.argmax(abs_values)
+            print guess_index
+            if core.SCA[guess_index] > 0:
+                a = 1
+            else:
+                a = -1
+            x0 = core.FLY[guess_index]
+            p0 = [a, x0, 0.5, 0.5, 0.01, 0.01]
+            print p0
+            popt, pcov = curve_fit(piecewise_split_pv, x, y, p0=p0)
+            print popt
         for each in array_list:
             if each.plot_flag.get():
                 if counter.data_type.get() == 'Derivative':
                     plt.plot(each.FLY[1:-1], each.SCA[1:-1], marker='.', ls='-')
+                    if staff.focus_flag.get():
+                        plt.plot(x, piecewise_split_pv(x, *popt), 'ro:')
                 else:
                     plt.plot(each.FLY, each.SCA, marker='.', ls='-')
     else:
@@ -1710,6 +1800,7 @@ data = DataLoad(frameFiles)
 over1 = Overlay(frameOverlays, label='over1')
 over2 = Overlay(frameOverlays, label='over2')
 over3 = Overlay(frameOverlays, label='over3')
+staff = Staff(root)
 
 # temporary!!!!
 cid = fig.canvas.mpl_connect('button_press_event', onclick)
