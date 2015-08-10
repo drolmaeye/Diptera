@@ -16,7 +16,7 @@ from epics import *
 from epics.devices import Struck
 import numpy as np
 from math import cos, sin, radians, pi, sqrt
-from scipy import exp
+from scipy import exp, integrate
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
@@ -1289,32 +1289,58 @@ class Staff:
         self.pv_mur = DoubleVar()
         self.pv_wl = DoubleVar()
         self.pv_wr = DoubleVar()
+        self.pv_asymmetry = DoubleVar()
+        self.pv_fwhm = DoubleVar()
+        self.pv_beamsize = DoubleVar()
+        self.popt = np.zeros(6)
+        self.pcov = np.zeros(6)
+        self.area = 0
+        self.err = 0
 
         # define and place widgets
         self.cbox_focus_flag = Checkbutton(self.frame, text='Focus fit',
                                            variable=self.focus_flag, command=update_plot)
         self.cbox_focus_flag.grid(row=1, rowspan=2, column=0, padx=5, pady=5)
-        self.label_pv_a = Label(self.frame, textvariable=self.pv_a, width=7)
-        self.label_pv_a.grid(row=1, rowspan=2, column=1, padx=5, pady=5)
-        self.label_pv_x0 = Label(self.frame, textvariable=self.pv_x0, width=7)
-        self.label_pv_x0.grid(row=1, rowspan=2, column=2, padx=5, pady=5)
-        self.label_pv_mul = Label(self.frame, textvariable=self.pv_mul, width=7)
-        self.label_pv_mul.grid(row=1, column=3, padx=5, pady=5)
-        self.label_pv_mur = Label(self.frame, textvariable=self.pv_mur, width=7)
-        self.label_pv_mur.grid(row=2, column=3, padx=5, pady=5)
-        self.label_pv_wl = Label(self.frame, textvariable=self.pv_wl, width=7)
-        self.label_pv_wl.grid(row=1, column=4, padx=5, pady=5)
-        self.label_pv_wr = Label(self.frame, textvariable=self.pv_wr, width=7)
-        self.label_pv_wr.grid(row=2, column=4, padx=5, pady=5)
+        self.label_less = Label(self.frame, text='x < center')
+        self.label_less.grid(row=1, column=1)
+        self.label_more = Label(self.frame, text='x > center')
+        self.label_more.grid(row=2, column=1)
+        self.label_pv_a = Label(self.frame, textvariable=self.pv_a, width=7, relief=SUNKEN)
+        self.label_pv_a.grid(row=1, rowspan=2, column=2, padx=5, pady=5)
+        self.label_pv_x0 = Label(self.frame, textvariable=self.pv_x0, width=7, relief=SUNKEN)
+        self.label_pv_x0.grid(row=1, rowspan=2, column=3, padx=5, pady=5)
+        self.label_pv_mul = Label(self.frame, textvariable=self.pv_mul, width=7, relief=SUNKEN)
+        self.label_pv_mul.grid(row=1, column=4, padx=5, pady=5)
+        self.label_pv_mur = Label(self.frame, textvariable=self.pv_mur, width=7, relief=SUNKEN)
+        self.label_pv_mur.grid(row=2, column=4, padx=5, pady=5)
+        self.label_pv_wl = Label(self.frame, textvariable=self.pv_wl, width=7, relief=SUNKEN)
+        self.label_pv_wl.grid(row=1, column=5, padx=5, pady=5)
+        self.label_pv_wr = Label(self.frame, textvariable=self.pv_wr, width=7, relief=SUNKEN)
+        self.label_pv_wr.grid(row=2, column=5, padx=5, pady=5)
+        self.label_pv_asymmetry = Label(self.frame, textvariable=self.pv_asymmetry, width=7, relief=SUNKEN)
+        self.label_pv_asymmetry.grid(row=1, rowspan=2, column=6, padx=5, pady=5)
+        self.label_pv_fwhm = Label(self.frame, textvariable=self.pv_fwhm, width=7, relief=SUNKEN)
+        self.label_pv_fwhm.grid(row=1, rowspan=2, column=7, padx=5, pady=5)
+        self.label_pv_beamsize = Label(self.frame, textvariable=self.pv_beamsize, width=7, relief=SUNKEN)
+        self.label_pv_beamsize.grid(row=1, rowspan=2, column=8, padx=5, pady=5)
         self.button_zero_x = Button(self.frame, text='zero x', command=self.zero_x)
-        self.button_zero_x.grid(row=0, column=5, padx=5, pady=5)
+        self.button_zero_x.grid(row=0, column=9, padx=5, pady=5)
         self.button_zero_y = Button(self.frame, text='zero y', command=self.zero_y)
-        self.button_zero_y.grid(row=1, column=5, padx=5, pady=5)
+        self.button_zero_y.grid(row=1, column=9, padx=5, pady=5)
         self.button_zero_z = Button(self.frame, text='zero z', command=self.zero_z)
-        self.button_zero_z.grid(row=2, column=5, padx=5, pady=5)
+        self.button_zero_z.grid(row=2, column=9, padx=5, pady=5)
 
         # hide window on startup
         self.popup.withdraw()
+
+    def calc_mixes(self):
+        wl = self.pv_wl.get()
+        wr = self.pv_wr.get()
+        asym = (wl - wr)/(wl + wr)
+        fwhm = 0.5*wl + 0.5*wr
+        self.pv_asymmetry.set('%.2f' % asym)
+        self.pv_fwhm.set('%.4f' % fwhm)
+
 
     # Make these three one function using lambdas above to pass argument!!!
     def zero_x(self):
@@ -1462,6 +1488,12 @@ class DragVerticalLines:
             elif data.current_slice.get() == 3:
                 center.y_plus_pos.set('%.4f' % mid_fin[0])
             center.calc_deltas()
+        if staff.focus_flag.get() and counter.data_type.get() == 'Derivative':
+            if core.dimension == 1 or data.slice_flag.get():
+                beamsize_integral()
+                print staff.area, staff.pv_a.get()
+                fraction = staff.area / staff.pv_a.get()
+                staff.pv_beamsize.set('%.3f' % fraction)
 
 
 def onclick(event):
@@ -1510,6 +1542,12 @@ def piecewise_split_pv(x, a, x0, mul, mur, wl, wr):
             lambda x: a * (mur * (2/pi) * (wr / (4*(x-x0)**2 + wr**2)) + (1 - mur) * (sqrt(4*np.log(2)) / (sqrt(pi) * wr)) * exp(-(4*np.log(2)/wr**2)*(x-x0)**2))]
     return np.piecewise(x, condlist, funclist)
 
+def beamsize_integral():
+    t_popt = tuple(staff.popt)
+    lower_bound = float(hax.min_pos.get())
+    upper_bound = float(hax.max_pos.get())
+    staff.area, staff.err = integrate.quad(func=piecewise_split_pv, a=lower_bound,
+                                           b=upper_bound, args=t_popt)
 
 
 def update_plot(*args):
@@ -1647,27 +1685,37 @@ def update_plot(*args):
         image_index = yind*fly_axis_length + xind + 1
         data.index.set(image_index)
         if staff.focus_flag.get() and counter.data_type.get() == 'Derivative':
-            x = core.FLY
-            y = core.SCA
             abs_values = np.abs(core.SCA)
-            print abs_values
             guess_index = np.argmax(abs_values)
-            print guess_index
             if core.SCA[guess_index] > 0:
                 a = 1
             else:
                 a = -1
             x0 = core.FLY[guess_index]
-            p0 = [a, x0, 0.5, 0.5, 0.01, 0.01]
-            print p0
-            popt, pcov = curve_fit(piecewise_split_pv, x, y, p0=p0)
-            print popt
+            p0 = [a, x0, 0.5, 0.5, 0.005, 0.005]
+            staff.popt, pcov = curve_fit(piecewise_split_pv, core.FLY, core.SCA, p0=p0)
+            staff.pv_a.set('%.2f' % staff.popt[0])
+            staff.pv_x0.set('%.4f' % staff.popt[1])
+            staff.pv_mul.set('%.2f' % staff.popt[2])
+            staff.pv_mur.set('%.2f' % staff.popt[3])
+            staff.pv_wl.set('%.4f' % staff.popt[4])
+            staff.pv_wr.set('%.4f' % staff.popt[5])
+            staff.calc_mixes()
+            # tpopt = tuple(staff.popt)
+            # lower_bound = float(hax.min_pos.get())
+            # upper_bound = float(hax.max_pos.get())
+            # area, err = integrate.quad(func=piecewise_split_pv, a=lower_bound,
+            #                            b=upper_bound, args=tpopt)
+            beamsize_integral()
+            print staff.area, staff.pv_a.get()
+            fraction = staff.area / staff.pv_a.get()
+            staff.pv_beamsize.set('%.3f' % fraction)
         for each in array_list:
             if each.plot_flag.get():
                 if counter.data_type.get() == 'Derivative':
                     plt.plot(each.FLY[1:-1], each.SCA[1:-1], marker='.', ls='-')
                     if staff.focus_flag.get():
-                        plt.plot(x, piecewise_split_pv(x, *popt), 'ro:')
+                        plt.plot(core.FLY, piecewise_split_pv(core.FLY, *staff.popt), 'ro:')
                 else:
                     plt.plot(each.FLY, each.SCA, marker='.', ls='-')
     else:

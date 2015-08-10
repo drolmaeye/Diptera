@@ -3,7 +3,7 @@ __author__ = 'j.smith'
 import pylab as plb
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
-from scipy import exp
+from scipy import exp, integrate
 import numpy as np
 from math import pi, sqrt
 
@@ -147,11 +147,11 @@ def gausr(x,a,x0,sigmar):
     return a*exp(-(x-x0)**2/(2*sigmar**2))
 
 
-def pv(x, y0, a, mul, mur, x0, wl, wr):
+def pv(x, a, mul, mur, x0, wl, wr):
     condlist = [x < x0, x >= x0]
     funclist = [
-         lambda x: y0 + a * (mul * (2/pi) * (wl / (4*(x-x0)**2 + wl**2)) + (1 - mul) * (sqrt(4*np.log(2)) / (sqrt(pi) * wl)) * exp(-(4*np.log(2)/wl**2)*(x-x0)**2)),
-         lambda x: y0 + a * (mur * (2/pi) * (wr / (4*(x-x0)**2 + wr**2)) + (1 - mur) * (sqrt(4*np.log(2)) / (sqrt(pi) * wr)) * exp(-(4*np.log(2)/wr**2)*(x-x0)**2))]
+         lambda x: a * (mul * (2/pi) * (wl / (4*(x-x0)**2 + wl**2)) + (1 - mul) * (sqrt(4*np.log(2)) / (sqrt(pi) * wl)) * exp(-(4*np.log(2)/wl**2)*(x-x0)**2)),
+         lambda x: a * (mur * (2/pi) * (wr / (4*(x-x0)**2 + wr**2)) + (1 - mur) * (sqrt(4*np.log(2)) / (sqrt(pi) * wr)) * exp(-(4*np.log(2)/wr**2)*(x-x0)**2))]
     return np.piecewise(x, condlist, funclist)
 
 
@@ -166,10 +166,16 @@ def pw(x, a, x0, sigmal, sigmar):
 # popt,pcov = curve_fit(pw,x,y,p0=[1,.75,.1,.1])
 # print popt
 
-popt,pcov = curve_fit(pv, x, y, p0=[0, -1, .5, .5, .75, .008, .008])
+popt,pcov = curve_fit(pv, x, y, p0=[-1, .5, .5, .75, .008, .008])
 print popt
-perr = np.sqrt(np.diag(pcov))
-print perr
+tpopt = tuple(popt)
+# perr = np.sqrt(np.diag(pcov))
+# print perr
+area, err = integrate.quad(func=pv, a=tpopt[3]-tpopt[4], b=tpopt[3]+tpopt[5], args=tpopt)
+print area, err
+beam = (area/tpopt[0])
+print beam
+plt.fill_between(x[19:-19], pv(x[19:-19], *popt), alpha=0.1)
 plt.plot(x,y,'b+:',label='data')
 plt.plot(x,pv(x,*popt),'ro:',label='fit')
 plt.plot(x, (y-pv(x,*popt)))
