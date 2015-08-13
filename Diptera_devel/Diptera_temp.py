@@ -1296,6 +1296,7 @@ class Staff:
         self.pcov = np.zeros(6)
         self.area = 0
         self.err = 0
+        self.area_calc = 0
 
         # define and place widgets
         self.cbox_focus_flag = Checkbutton(self.frame, text='Focus fit',
@@ -1321,8 +1322,10 @@ class Staff:
         self.label_pv_asymmetry.grid(row=1, rowspan=2, column=6, padx=5, pady=5)
         self.label_pv_fwhm = Label(self.frame, textvariable=self.pv_fwhm, width=7, relief=SUNKEN)
         self.label_pv_fwhm.grid(row=1, rowspan=2, column=7, padx=5, pady=5)
-        self.label_pv_beamsize = Label(self.frame, textvariable=self.pv_beamsize, width=7, relief=SUNKEN)
+        self.label_pv_beamsize = Entry(self.frame, textvariable=self.pv_beamsize, width=7)
         self.label_pv_beamsize.grid(row=1, rowspan=2, column=8, padx=5, pady=5)
+        self.label_pv_beamsize.bind('<FocusOut>', self.find_width)
+        self.label_pv_beamsize.bind('<Return>', self.find_width)
         self.button_zero_x = Button(self.frame, text='zero x', command=self.zero_x)
         self.button_zero_x.grid(row=0, column=9, padx=5, pady=5)
         self.button_zero_y = Button(self.frame, text='zero y', command=self.zero_y)
@@ -1332,6 +1335,59 @@ class Staff:
 
         # hide window on startup
         self.popup.withdraw()
+
+    def find_width(self, *event):
+        staff.area_calc = 1
+        target = staff.pv_beamsize.get()
+        new_mid = staff.pv_x0.get()
+        new_min = new_mid - 0.008
+        new_max = new_mid + 0.008
+        step = 0.002
+        initial = staff.area / staff.pv_a.get()
+        if initial - target > 0:
+            direction = -1
+        else:
+            direction = 1
+        for i in range(100):
+            current = staff.area / staff.pv_a.get()
+            difference = current - target
+            if abs(difference) > 0.001:
+                if difference > 0 and direction == -1:
+                    direction = -1
+                elif difference < 0 and direction == 1:
+                    direction = 1
+                elif difference < 0 and direction == -1:
+                    step *= 0.4
+                    direction = 1
+                elif difference > 0 and direction == 1:
+                    step *= 0.4
+                    direction = -1
+                new_min -= step*direction
+                new_max += step*direction
+                hax.min_pos.set(new_min)
+                hax.max_pos.set(new_max)
+                beamsize_integral()
+            else:
+                if i:
+                    hax.min_pos.set('%.4f' % new_min)
+                    hax.mid_pos.set('%.4f' % new_mid)
+                    hax.max_pos.set('%.4f' % new_max)
+                    print i
+                    print difference
+                    update_plot()
+                staff.area_calc = 0
+                break
+
+
+
+
+
+
+
+
+
+
+
 
     def calc_mixes(self):
         wl = self.pv_wl.get()
@@ -1600,14 +1656,14 @@ def update_plot(*args):
                     index = each.overlay_slice.get() - 1
                     each.SCA = each.SCA[index]
     # clear fields and plot
-    hax.min_pos.set('')
-    hax.mid_pos.set('')
-    hax.max_pos.set('')
-    hax.width.set('')
-    vax.min_pos.set('')
-    vax.mid_pos.set('')
-    vax.max_pos.set('')
-    vax.width.set('')
+    # hax.min_pos.set('')
+    # hax.mid_pos.set('')
+    # hax.max_pos.set('')
+    # hax.width.set('')
+    # vax.min_pos.set('')
+    # vax.mid_pos.set('')
+    # vax.max_pos.set('')
+    # vax.width.set('')
     plt.clf()
     # plot it!
     plt.xlabel('Fly axis:  ' + fly_axis.axis.get())
@@ -1616,8 +1672,6 @@ def update_plot(*args):
         for each in array_list:
             if each.plot_flag.get():
                 shp = each.FLY.shape
-                #print shp
-                #print each.SCA.shape
                 each.SCA.shape = shp
         # set up Arun bars (draggable horizontal and vertical lines)
         f_min = np.amin(core.SCA)
@@ -1632,7 +1686,11 @@ def update_plot(*args):
                 m = (f2 - f1)/(x2 - x1)
                 x_mid = (f_mid - f1)/m + x1
                 mid_list.append(x_mid)
-        if len(mid_list) < 2:
+        if staff.area_calc:
+            x_left = float(hax.min_pos.get())
+            x_right = float(hax.max_pos.get())
+            x_mid = staff.pv_x0.get()
+        elif len(mid_list) < 2:
             x_min = np.amin(core.FLY)
             x_max = np.amax(core.FLY)
             x_span = (x_max - x_min)
