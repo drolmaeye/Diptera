@@ -538,6 +538,7 @@ class ScanActions:
                  rmd=core.RMD)
         new_index = str(int(index) + 1)
         step_axis.scan_no.set(new_index.zfill(3))
+        step_axis.flag.set(0)
         if center.c_flag.get():
             data.current_slice.set(1)
             data.slice_flag.set(1)
@@ -603,7 +604,7 @@ class Counters:
         self.entry_scale.bind('<Return>', self.scale_validate)
         self.entry_data_type = OptionMenu(self.frame, self.data_type, *self.data_type_list)
         self.entry_data_type.grid(row=1, rowspan=2, column=5, padx=0)
-        #  self.button_update = Button(self.frame, text='Update plot', command=update_plot)
+        # self.button_update = Button(self.frame, text='Update plot', command=update_plot)
         # self.button_update.grid(row=1, rowspan=2, column=6, padx=0)
         self.entry_max_scale = Entry(self.frame, textvariable=self.max_scale, width=5)
         self.entry_max_scale.grid(row=1, column=6)
@@ -818,7 +819,6 @@ class Centering:
         mX.move(f_pos, wait=True)
         center.button_delta_x.config(state=DISABLED, background='SystemButtonFace')
         center.c_flag.set(0)
-        step_axis.flag.set(0)
 
 
 class Position:
@@ -1656,14 +1656,18 @@ def update_plot(*args):
                     index = each.overlay_slice.get() - 1
                     each.SCA = each.SCA[index]
     # clear fields and plot
-    # hax.min_pos.set('')
-    # hax.mid_pos.set('')
-    # hax.max_pos.set('')
-    # hax.width.set('')
-    # vax.min_pos.set('')
-    # vax.mid_pos.set('')
-    # vax.max_pos.set('')
-    # vax.width.set('')
+    # ###if staff.area_calc:
+    # ###    x_left = float(hax.min_pos.get())
+    # ###    x_right = float(hax.max_pos.get())
+    # ###    x_mid = staff.pv_x0.get()
+    # ###hax.min_pos.set('')
+    # ###hax.mid_pos.set('')
+    # ###hax.max_pos.set('')
+    # ###hax.width.set('')
+    # ###vax.min_pos.set('')
+    # ###vax.mid_pos.set('')
+    # ###vax.max_pos.set('')
+    # ###vax.width.set('')
     plt.clf()
     # plot it!
     plt.xlabel('Fly axis:  ' + fly_axis.axis.get())
@@ -1745,10 +1749,7 @@ def update_plot(*args):
         if staff.focus_flag.get() and counter.data_type.get() == 'Derivative':
             abs_values = np.abs(core.SCA)
             guess_index = np.argmax(abs_values)
-            if core.SCA[guess_index] > 0:
-                a = 1
-            else:
-                a = -1
+            a = core.SCA[guess_index] * 0.005
             x0 = core.FLY[guess_index]
             p0 = [a, x0, 0.5, 0.5, 0.005, 0.005]
             staff.popt, pcov = curve_fit(piecewise_split_pv, core.FLY, core.SCA, p0=p0)
