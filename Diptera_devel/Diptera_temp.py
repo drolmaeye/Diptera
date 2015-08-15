@@ -584,6 +584,8 @@ class Counters:
         self.head_scale.grid(row=0, column=4)
         self.head_time = Label(self.frame, text='Data type', width=16)
         self.head_time.grid(row=0, column=5)
+        self.head_2d_scaling = Label(self.frame, text='----2D scaling----')
+        self.head_2d_scaling.grid(row=0, column=6, columnspan=4)
 
         # define and place widgets
         self.check_ref_flag = Checkbutton(self.frame, variable=self.ref_flag)
@@ -606,16 +608,24 @@ class Counters:
         self.entry_data_type.grid(row=1, rowspan=2, column=5, padx=0)
         # self.button_update = Button(self.frame, text='Update plot', command=update_plot)
         # self.button_update.grid(row=1, rowspan=2, column=6, padx=0)
-        self.entry_max_scale = Entry(self.frame, textvariable=self.max_scale, width=5)
-        self.entry_max_scale.grid(row=1, column=6)
+        self.entry_max_scale = Entry(self.frame, textvariable=self.max_scale, width=4)
+        self.entry_max_scale.grid(row=1, column=7, padx=5, pady=5)
         self.entry_max_scale.bind('<FocusOut>', self.max_scale_validate)
         self.entry_max_scale.bind('<Return>', self.max_scale_validate)
-        self.entry_min_scale = Entry(self.frame, textvariable=self.min_scale, width=5)
-        self.entry_min_scale.grid(row=2, column=6)
+        self.button_down_max = Button(self.frame, text='<', command=self.decrement_max)
+        self.button_down_max.grid(row=1, column=6, pady=5)
+        self.button_up_max = Button(self.frame, text='>', command=self.increment_max)
+        self.button_up_max.grid(row=1, column=8, pady=5)
+        self.entry_min_scale = Entry(self.frame, textvariable=self.min_scale, width=4)
+        self.entry_min_scale.grid(row=2, column=7, padx=5, pady=5)
         self.entry_min_scale.bind('<FocusOut>', self.min_scale_validate)
         self.entry_min_scale.bind('<Return>', self.min_scale_validate)
-        self.entry_levels = Entry(self.frame, textvariable=self.levels, width=5)
-        self.entry_levels.grid(row=1, rowspan=2, column=7)
+        self.button_down_min = Button(self.frame, text='<', command=self.decrement_min)
+        self.button_down_min.grid(row=2, column=6, pady=5)
+        self.button_up_min = Button(self.frame, text='>', command=self.decrement_min)
+        self.button_up_min.grid(row=2, column=8, pady=5)
+        self.entry_levels = Entry(self.frame, textvariable=self.levels, width=4)
+        self.entry_levels.grid(row=1, rowspan=2, column=9, padx=10, pady=5)
         self.entry_levels.bind('<FocusOut>', self.levels_validate)
         self.entry_levels.bind('<Return>', self.levels_validate)
 
@@ -668,6 +678,19 @@ class Counters:
             self.levels.set(64)
             update_plot()
             invalid_entry()
+
+    def decrement_max(self):
+        pass
+
+    def increment_max(self):
+        pass
+
+    def decrement_min(self):
+        pass
+
+    def increment_min(self):
+        pass
+
 
 
 class Images:
@@ -761,7 +784,11 @@ class Centering:
         self.y_center_pos = StringVar()
         self.y_plus_pos = StringVar()
         self.delta_x = StringVar()
+        self.absolute_x = StringVar()
         self.delta_y = StringVar()
+        self.absolute_y = StringVar()
+        self.delta_base_y = StringVar()
+        self.absolute_base_y = StringVar()
         self.delta_w.set(2.0)
 
         # make and place column headings
@@ -779,6 +806,8 @@ class Centering:
         self.head_delta_x.grid(row=0, column=6)
         self.head_delta_y = Label(self.frame, text='y correction')
         self.head_delta_y.grid(row=0, column=7)
+        # self.head_absolute_x = Label(self.frame, text='Final absolute position ->')
+        # self.head_absolute_x.grid(row=2, column=4, columnspan=2)
 
         # make and place widgets
         self.cbox_c_flag = Checkbutton(self.frame, text='Enable', variable=self.c_flag)
