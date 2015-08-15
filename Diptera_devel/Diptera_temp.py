@@ -622,7 +622,7 @@ class Counters:
         self.entry_min_scale.bind('<Return>', self.min_scale_validate)
         self.button_down_min = Button(self.frame, text='<', command=self.decrement_min)
         self.button_down_min.grid(row=2, column=6, pady=5)
-        self.button_up_min = Button(self.frame, text='>', command=self.decrement_min)
+        self.button_up_min = Button(self.frame, text='>', command=self.increment_min)
         self.button_up_min.grid(row=2, column=8, pady=5)
         self.entry_levels = Entry(self.frame, textvariable=self.levels, width=4)
         self.entry_levels.grid(row=1, rowspan=2, column=9, padx=10, pady=5)
@@ -670,7 +670,7 @@ class Counters:
         try:
             val = self.levels.get()
             isinstance(val, int)
-            if 4 <= val < 128:
+            if 4 <= val <= 128:
                 update_plot()
             else:
                 raise ValueError
@@ -680,17 +680,40 @@ class Counters:
             invalid_entry()
 
     def decrement_max(self):
-        pass
+        old_max = self.max_scale.get()
+        new_max = old_max - 1
+        if new_max > self.min_scale.get():
+            self.max_scale.set(new_max)
+            update_plot()
+        else:
+            pass
 
     def increment_max(self):
-        pass
+        old_max = self.max_scale.get()
+        new_max = old_max + 1
+        if new_max <= 100:
+            self.max_scale.set(new_max)
+            update_plot()
+        else:
+            pass
 
     def decrement_min(self):
-        pass
+        old_min = self.min_scale.get()
+        new_min = old_min - 1
+        if new_min >= 0:
+            self.min_scale.set(new_min)
+            update_plot()
+        else:
+            pass
 
     def increment_min(self):
-        pass
-
+        old_min = self.min_scale.get()
+        new_min = old_min + 1
+        if new_min < self.max_scale.get():
+            self.min_scale.set(new_min)
+            update_plot()
+        else:
+            pass
 
 
 class Images:
@@ -787,8 +810,8 @@ class Centering:
         self.absolute_x = StringVar()
         self.delta_y = StringVar()
         self.absolute_y = StringVar()
-        self.delta_base_y = StringVar()
-        self.absolute_base_y = StringVar()
+        self.delta_y_base = StringVar()
+        self.absolute_y_base = StringVar()
         self.delta_w.set(2.0)
 
         # make and place column headings
@@ -806,8 +829,8 @@ class Centering:
         self.head_delta_x.grid(row=0, column=6)
         self.head_delta_y = Label(self.frame, text='y correction')
         self.head_delta_y.grid(row=0, column=7)
-        # self.head_absolute_x = Label(self.frame, text='Final absolute position ->')
-        # self.head_absolute_x.grid(row=2, column=4, columnspan=2)
+        self.head_absolute_x = Label(self.frame, text='Final absolute position ->')
+        self.head_absolute_x.grid(row=2, column=4, columnspan=2)
 
         # make and place widgets
         self.cbox_c_flag = Checkbutton(self.frame, text='Enable', variable=self.c_flag)
@@ -825,29 +848,51 @@ class Centering:
         self.button_delta_x.config(state=DISABLED)
         self.label_delta_y = Label(self.frame, textvariable=self.delta_y, relief=SUNKEN, width=8)
         self.label_delta_y.grid(row=1, column=7, padx=5, pady=5)
+        self.label_absolute_x = Label(self.frame, textvariable=self.absolute_x, relief=SUNKEN, width=8)
+        self.label_absolute_x.grid(row=2, column=6, padx=5, pady=5)
 
     def calc_deltas(self):
         if not center.y_minus_pos.get() or not center.y_center_pos.get() or not center.y_plus_pos.get():
             return
         else:
             center.button_delta_x.config(state=NORMAL, background='green')
+            staff.button_move_all.config(state=NORMAL, background='green')
             dsx_plus = float(center.y_plus_pos.get()) - float(center.y_center_pos.get())
             dsx_minus = float(center.y_minus_pos.get()) - float(center.y_center_pos.get())
-            delta_y = (dsx_plus + dsx_minus)/2/(cos(radians(center.delta_w.get()))-1)
             delta_x = (dsx_plus - dsx_minus)/2/(sin(radians(center.delta_w.get())))
-            center.delta_y.set('%.4f' % delta_y)
+            delta_y = (dsx_plus + dsx_minus)/2/(cos(radians(center.delta_w.get()))-1)
+            delta_y_base = -delta_y
+            abs_x = mX.RBV + delta_x
+            abs_y = mY.RBV + delta_y
+            abs_base = mYbase.RBV - delta_y
             center.delta_x.set('%.4f' % delta_x)
+            center.delta_y.set('%.4f' % delta_y)
+            center.delta_y_base.set('%.4f' % delta_y_base)
+            center.absolute_x.set('%.4f' % abs_x)
+            center.absolute_y.set('%.4f' % abs_y)
+            center.absolute_y_base.set('%.4f' % abs_base)
 
     def move_x(self):
         try:
-            val = float(center.delta_x.get())
+            abs_x = float(self.absolute_x.get())
         except ValueError:
             return
-        i_pos = mX.RBV
-        f_pos = i_pos + val
-        mX.move(f_pos, wait=True)
-        center.button_delta_x.config(state=DISABLED, background='SystemButtonFace')
-        center.c_flag.set(0)
+        mX.move(abs_x, wait=True)
+        self.button_delta_x.config(state=DISABLED, background='SystemButtonFace')
+        self.c_flag.set(0)
+
+    def move_all(self):
+        try:
+            abs_x = float(self.absolute_x.get())
+            abs_y = float(self.absolute_y.get())
+            abs_base = float(self.absolute_y_base.get())
+        except ValueError:
+            return
+        mX.move(abs_x, wait=True)
+        mY.move(abs_y, wait=True)
+        mYbase.move(abs_base, wait=True)
+        staff.button_move_all.config(state=DISABLED, background='SystemButtonFace')
+        self.c_flag.set(0)
 
 
 class Position:
@@ -1305,10 +1350,14 @@ class Overlay:
 class Staff:
     def __init__(self, master):
         self.popup = Toplevel(master)
-        self.popup.title('Extended capabilities during alignment')
+        self.popup.title('Alignment Tools')
 
-        self.frame = Frame(self.popup)
-        self.frame.pack()
+        self.frame_fit = Frame(self.popup, bd=5, relief=RIDGE, padx=12, pady=10)
+        self.frame_fit.grid(row=0, column=0, columnspan=2)
+        self.frame_center = Frame(self.popup, bd=5, relief=RIDGE, padx=10, pady=10)
+        self.frame_center.grid(row=1, column=0)
+        self.frame_zero = Frame(self.popup, bd=5, relief=RIDGE, padx=9, pady=2)
+        self.frame_zero.grid(row=1, column=1)
 
         # define instance variables and set defaults
         self.focus_flag = IntVar()
@@ -1327,40 +1376,91 @@ class Staff:
         self.err = 0
         self.area_calc = 0
 
-        # define and place widgets
-        self.cbox_focus_flag = Checkbutton(self.frame, text='Focus fit',
+        # make frame_fit headings
+        self.head_label = Label(self.frame_fit, text='PSEUDO-VOIGT PARAMETERS')
+        self.head_label.grid(row=0, column=0)
+        self.head_area = Label(self.frame_fit, text='Area')
+        self.head_area.grid(row=0, column=2)
+        self.head_x0 = Label(self.frame_fit, text='Center')
+        self.head_x0.grid(row=0, column=3)
+        self.head_eta = Label(self.frame_fit, text=u'\u03b7')
+        self.head_eta.grid(row=0, column=4)
+        self.head_width = Label(self.frame_fit, text='Width')
+        self.head_width.grid(row=0, column=5)
+        self.head_asymmetry = Label(self.frame_fit, text='Asymmetry')
+        self.head_asymmetry.grid(row=0, column=6)
+        self.head_fwhm = Label(self.frame_fit, text='FWHM')
+        self.head_fwhm.grid(row=0, column=7)
+        self.head_fraction = Label(self.frame_fit, text='Beam fraction')
+        self.head_fraction.grid(row=0, column=8)
+
+
+        # define and place frame_fit widgets
+        self.cbox_focus_flag = Checkbutton(self.frame_fit, text='Focus fit',
                                            variable=self.focus_flag, command=update_plot)
         self.cbox_focus_flag.grid(row=1, rowspan=2, column=0, padx=5, pady=5)
-        self.label_less = Label(self.frame, text='x < center')
+        self.label_less = Label(self.frame_fit, text='x < Center')
         self.label_less.grid(row=1, column=1)
-        self.label_more = Label(self.frame, text='x > center')
+        self.label_more = Label(self.frame_fit, text='x > Center')
         self.label_more.grid(row=2, column=1)
-        self.label_pv_a = Label(self.frame, textvariable=self.pv_a, width=7, relief=SUNKEN)
+        self.label_pv_a = Label(self.frame_fit, textvariable=self.pv_a, width=7, relief=SUNKEN)
         self.label_pv_a.grid(row=1, rowspan=2, column=2, padx=5, pady=5)
-        self.label_pv_x0 = Label(self.frame, textvariable=self.pv_x0, width=7, relief=SUNKEN)
+        self.label_pv_x0 = Label(self.frame_fit, textvariable=self.pv_x0, width=7, relief=SUNKEN)
         self.label_pv_x0.grid(row=1, rowspan=2, column=3, padx=5, pady=5)
-        self.label_pv_mul = Label(self.frame, textvariable=self.pv_mul, width=7, relief=SUNKEN)
+        self.label_pv_mul = Label(self.frame_fit, textvariable=self.pv_mul, width=7, relief=SUNKEN)
         self.label_pv_mul.grid(row=1, column=4, padx=5, pady=5)
-        self.label_pv_mur = Label(self.frame, textvariable=self.pv_mur, width=7, relief=SUNKEN)
+        self.label_pv_mur = Label(self.frame_fit, textvariable=self.pv_mur, width=7, relief=SUNKEN)
         self.label_pv_mur.grid(row=2, column=4, padx=5, pady=5)
-        self.label_pv_wl = Label(self.frame, textvariable=self.pv_wl, width=7, relief=SUNKEN)
+        self.label_pv_wl = Label(self.frame_fit, textvariable=self.pv_wl, width=7, relief=SUNKEN)
         self.label_pv_wl.grid(row=1, column=5, padx=5, pady=5)
-        self.label_pv_wr = Label(self.frame, textvariable=self.pv_wr, width=7, relief=SUNKEN)
+        self.label_pv_wr = Label(self.frame_fit, textvariable=self.pv_wr, width=7, relief=SUNKEN)
         self.label_pv_wr.grid(row=2, column=5, padx=5, pady=5)
-        self.label_pv_asymmetry = Label(self.frame, textvariable=self.pv_asymmetry, width=7, relief=SUNKEN)
+        self.label_pv_asymmetry = Label(self.frame_fit, textvariable=self.pv_asymmetry, width=7, relief=SUNKEN)
         self.label_pv_asymmetry.grid(row=1, rowspan=2, column=6, padx=5, pady=5)
-        self.label_pv_fwhm = Label(self.frame, textvariable=self.pv_fwhm, width=7, relief=SUNKEN)
+        self.label_pv_fwhm = Label(self.frame_fit, textvariable=self.pv_fwhm, width=7, relief=SUNKEN)
         self.label_pv_fwhm.grid(row=1, rowspan=2, column=7, padx=5, pady=5)
-        self.label_pv_beamsize = Entry(self.frame, textvariable=self.pv_beamsize, width=7)
+        self.label_pv_beamsize = Entry(self.frame_fit, textvariable=self.pv_beamsize, width=7)
         self.label_pv_beamsize.grid(row=1, rowspan=2, column=8, padx=5, pady=5)
         self.label_pv_beamsize.bind('<FocusOut>', self.find_width)
         self.label_pv_beamsize.bind('<Return>', self.find_width)
-        self.button_zero_x = Button(self.frame, text='zero x', command=self.zero_x)
-        self.button_zero_x.grid(row=0, column=9, padx=5, pady=5)
-        self.button_zero_y = Button(self.frame, text='zero y', command=self.zero_y)
-        self.button_zero_y.grid(row=1, column=9, padx=5, pady=5)
-        self.button_zero_z = Button(self.frame, text='zero z', command=self.zero_z)
-        self.button_zero_z.grid(row=2, column=9, padx=5, pady=5)
+
+        # make frame_center headings
+        self.head_label = Label(self.frame_center, text='FULL CENTERING CONTROL')
+        self.head_label.grid(row=0, column=0)
+        self.head_cenx = Label(self.frame_center, text='Cen X')
+        self.head_cenx.grid(row=0, column=2, padx=5, pady=5)
+        self.head_ceny = Label(self.frame_center, text='Cen Y')
+        self.head_ceny.grid(row=0, column=3, padx=5, pady=5)
+        self.head_basey = Label(self.frame_center, text='Base Y')
+        self.head_basey.grid(row=0, column=4, padx=5, pady=5)
+
+        # make and place frame_center widgets
+        self.label_deltas = Label(self.frame_center, text='Deltas')
+        self.label_deltas.grid(row=1, column=1, padx=5, pady=5)
+        self.label_del_x = Label(self.frame_center, textvariable=center.delta_x, relief=SUNKEN, width=8)
+        self.label_del_x.grid(row=1, column=2, padx=5, pady=5)
+        self.label_del_y = Label(self.frame_center, textvariable=center.delta_y, relief=SUNKEN, width=8)
+        self.label_del_y.grid(row=1, column=3, padx=5, pady=5)
+        self.label_del_base = Label(self.frame_center, textvariable=center.delta_y_base, relief=SUNKEN, width=8)
+        self.label_del_base.grid(row=1, column=4, padx=5, pady=5)
+        self.label_absolute = Label(self.frame_center, text='Target Positions')
+        self.label_absolute.grid(row=2, column=1, padx=5, pady=5)
+        self.label_abs_x = Label(self.frame_center, textvariable=center.absolute_x, relief=SUNKEN, width=8)
+        self.label_abs_x.grid(row=2, column=2, padx=5, pady=5)
+        self.label_abs_y = Label(self.frame_center, textvariable=center.absolute_y, relief=SUNKEN, width=8)
+        self.label_abs_y.grid(row=2, column=3, padx=5, pady=5)
+        self.label_abs_base = Label(self.frame_center, textvariable=center.absolute_y_base, relief=SUNKEN, width=8)
+        self.label_abs_base.grid(row=2, column=4, padx=5, pady=5)
+        self.button_move_all = Button(self.frame_center, text='Move All', command=center.move_all, width=12)
+        self.button_move_all.grid(row=1, rowspan=2, column=5, padx=10, pady=5)
+
+        # frame_zero widgets
+        self.button_zero_x = Button(self.frame_zero, text='Re-zero x', command=self.zero_x, width=8)
+        self.button_zero_x.grid(row=0, column=0, padx=10, pady=5)
+        self.button_zero_y = Button(self.frame_zero, text='Re-zero y', command=self.zero_y, width=8)
+        self.button_zero_y.grid(row=1, column=0, padx=10, pady=5)
+        self.button_zero_z = Button(self.frame_zero, text='Re-zero z', command=self.zero_z, width=8)
+        self.button_zero_z.grid(row=2, column=0, padx=10, pady=5)
 
         # hide window on startup
         self.popup.withdraw()
@@ -1407,17 +1507,6 @@ class Staff:
                 staff.area_calc = 0
                 break
 
-
-
-
-
-
-
-
-
-
-
-
     def calc_mixes(self):
         wl = self.pv_wl.get()
         wr = self.pv_wr.get()
@@ -1429,7 +1518,11 @@ class Staff:
 
     # Make these three one function using lambdas above to pass argument!!!
     def zero_x(self):
-        pass
+        confirm = askyesno('Confirm action', 'Are you sure you want to proceed?')
+        if confirm:
+            print 'I would move!'
+        else:
+            print 'I would not move'
         # ###mX.SET = 1
         # ###mX.VAL = 0
         # ###mX.SET = 0
@@ -1611,6 +1704,9 @@ def overwrite_warn():
     showwarning('Overwrite Warning',
                 'Scan no. and/or Image No. automatically incremented')
 
+def confirm_action():
+    askyesno('Confirm action', 'Are you sure you want to proceed?')
+
 
 def close_quit():
     # add dialog box back in and indent following code after testing period
@@ -1620,12 +1716,17 @@ def close_quit():
     root.quit()
 
 
+def hide_window():
+    staff.popup.withdraw()
+
+
 def piecewise_split_pv(x, a, x0, mul, mur, wl, wr):
     condlist = [x < x0, x >= x0]
     funclist = [
             lambda x: a * (mul * (2/pi) * (wl / (4*(x-x0)**2 + wl**2)) + (1 - mul) * (sqrt(4*np.log(2)) / (sqrt(pi) * wl)) * exp(-(4*np.log(2)/wl**2)*(x-x0)**2)),
             lambda x: a * (mur * (2/pi) * (wr / (4*(x-x0)**2 + wr**2)) + (1 - mur) * (sqrt(4*np.log(2)) / (sqrt(pi) * wr)) * exp(-(4*np.log(2)/wr**2)*(x-x0)**2))]
     return np.piecewise(x, condlist, funclist)
+
 
 def beamsize_integral():
     t_popt = tuple(staff.popt)
@@ -1858,6 +1959,7 @@ mY = Motor('XPSGP:m4')
 mZ = Motor('XPSGP:m3')
 mW = Motor('XPSGP:m2')
 mWGP = Motor('XPSGP:m1')
+mYbase = Motor('16IDB:m4')
 
 mXpco = Device('XPSGP:m5', pco_args)
 mYpco = Device('XPSGP:m4', pco_args)
@@ -1941,5 +2043,6 @@ staff = Staff(root)
 # temporary!!!!
 cid = fig.canvas.mpl_connect('button_press_event', onclick)
 root.protocol('WM_DELETE_WINDOW', close_quit)
+staff.popup.protocol('WM_DELETE_WINDOW', hide_window)
 root.mainloop()
 
