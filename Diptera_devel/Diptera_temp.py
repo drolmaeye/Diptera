@@ -186,10 +186,17 @@ class ScanBox:
         size = (f - i) / (p - 1)
         if self == fly_axis:
             msize = size*10000
+            # print msize
             quotient = divmod(msize, 5)
-            if quotient[0] > 1 and round(quotient[1], 5) == 0:
+            # print quotient
+            if quotient[0] >= 1 and round(quotient[1], 5) == 0:
                 fly_axis.flag.set(1)
                 fly_axis.led.config(state=NORMAL)
+                # print 'normal'
+            elif quotient[0] == 0 and round(quotient[1], 0) == msize:
+                fly_axis.flag.set(1)
+                fly_axis.led.config(state=NORMAL)
+                # print 'special'
             else:
                 fly_axis.flag.set(0)
                 fly_axis.led.config(state=DISABLED)
@@ -814,6 +821,9 @@ class Centering:
         self.absolute_y_base = StringVar()
         self.delta_w.set(2.0)
 
+        # set up trace on c_flag to verify buttons are disabled
+        self.c_flag.trace('w', self.disable_move_buttons)
+
         # make and place column headings
         self.head_center = Label(self.frame, text='CENTERING CONTROL')
         self.head_center.grid(row=0, column=0, columnspan=2, pady=5, stick='w')
@@ -829,7 +839,7 @@ class Centering:
         self.head_delta_x.grid(row=0, column=6)
         self.head_delta_y = Label(self.frame, text='y correction')
         self.head_delta_y.grid(row=0, column=7)
-        self.head_absolute_x = Label(self.frame, text='Final absolute position ->')
+        self.head_absolute_x = Label(self.frame, text='Final target position ->')
         self.head_absolute_x.grid(row=2, column=4, columnspan=2)
 
         # make and place widgets
@@ -843,19 +853,19 @@ class Centering:
         self.label_y_center.grid(row=1, column=4, padx=5, pady=5)
         self.label_y_plus = Label(self.frame, textvariable=self.y_plus_pos, relief=SUNKEN, width=8)
         self.label_y_plus.grid(row=1, column=5, padx=5, pady=5)
-        self.button_delta_x = Button(self.frame, textvariable=self.delta_x, command=self.move_x, width=7)
-        self.button_delta_x.grid(row=1, column=6, padx=5, pady=5)
-        self.button_delta_x.config(state=DISABLED)
+        self.label_delta_x = Label(self.frame, textvariable=self.delta_x, relief=SUNKEN, width=8)
+        self.label_delta_x.grid(row=1, column=6, padx=5, pady=5)
         self.label_delta_y = Label(self.frame, textvariable=self.delta_y, relief=SUNKEN, width=8)
         self.label_delta_y.grid(row=1, column=7, padx=5, pady=5)
-        self.label_absolute_x = Label(self.frame, textvariable=self.absolute_x, relief=SUNKEN, width=8)
-        self.label_absolute_x.grid(row=2, column=6, padx=5, pady=5)
+        self.button_absolute_x = Button(self.frame, textvariable=self.absolute_x, command=self.move_x, width=7)
+        self.button_absolute_x.grid(row=2, column=6, padx=5, pady=5)
+        self.button_absolute_x.config(state=DISABLED)
 
     def calc_deltas(self):
         if not center.y_minus_pos.get() or not center.y_center_pos.get() or not center.y_plus_pos.get():
             return
         else:
-            center.button_delta_x.config(state=NORMAL, background='green')
+            center.button_absolute_x.config(state=NORMAL, background='green')
             staff.button_move_all.config(state=NORMAL, background='green')
             dsx_plus = float(center.y_plus_pos.get()) - float(center.y_center_pos.get())
             dsx_minus = float(center.y_minus_pos.get()) - float(center.y_center_pos.get())
@@ -878,7 +888,6 @@ class Centering:
         except ValueError:
             return
         mX.move(abs_x, wait=True)
-        self.button_delta_x.config(state=DISABLED, background='SystemButtonFace')
         self.c_flag.set(0)
 
     def move_all(self):
@@ -891,8 +900,13 @@ class Centering:
         mX.move(abs_x, wait=True)
         mY.move(abs_y, wait=True)
         mYbase.move(abs_base, wait=True)
-        staff.button_move_all.config(state=DISABLED, background='SystemButtonFace')
         self.c_flag.set(0)
+
+    def disable_move_buttons(self, *args):
+        if not self.c_flag.get():
+            self.button_absolute_x.config(state=DISABLED, background='SystemButtonFace')
+            staff.button_move_all.config(state=DISABLED, background='SystemButtonFace')
+
 
 
 class Position:
@@ -1035,20 +1049,44 @@ class Actions:
 
         # make and place widgets
         self.button_abort = Button(self.frame, text='Abort',
-                                   foreground='red', height=2, width=15,
+                                   bg='red', height=2, width=14,
                                    font=bigfont, command=self.abort)
-        self.button_abort.grid(row=0, column=0, padx=5)
+        self.button_abort.grid(row=0, column=0, padx=8, pady=20)
+        self.button_more = Button(self.frame, text='More', height=2, width=14,
+                                  font=bigfont, command=self.more_less)
+        self.button_more.grid(row=0, column=1, padx=8, pady=20)
         self.button_staff = Button(self.frame,
-                                   text='Staff',
-                                   height=2, width=15, font=bigfont,
+                                   text='Alignment',
+                                   height=2, width=14, font=bigfont,
                                    command=self.open_staff)
-        self.button_staff.grid(row=0, column=1, padx=5)
-        self.quit_button = Button(self.frame, text='Quit', height=2, width=15,
+        self.button_staff.grid(row=0, column=2, padx=8, pady=20)
+        self.quit_button = Button(self.frame, text='Quit', height=2, width=14,
                                   font=bigfont, command=close_quit)
-        self.quit_button.grid(row=0, column=2, padx=5)
+        self.quit_button.grid(row=0, column=3, padx=8, pady=20)
 
     def abort(self):
         action.abort.set(1)
+
+    def more_less(self):
+        # w = root.winfo_width()
+        w = 1351
+        h = root.winfo_height()
+        x = root.winfo_x()
+        y = root.winfo_y()
+        # print w, h, x, y
+        if h > 800:
+            h = 712
+            image.flag.set(0)
+            over1.plot_flag.set(0)
+            over2.plot_flag.set(0)
+            over3.plot_flag.set(0)
+            action.button_more.configure(text='More')
+            if data.current_file.get():
+                update_plot()
+        else:
+            h = 871
+            action.button_more.configure(text='Less')
+        root.geometry('%dx%d+%d+%d' % (w, h, x, y))
 
     def open_staff(self):
         staff.popup.deiconify()
@@ -1244,6 +1282,8 @@ class Overlay:
         self.button_overlay_grab.grid(row=1, column=7, padx=5, pady=5)
 
     def activate_overlay(self):
+        if not self.overlay_file.get():
+            self.grab_data()
         update_plot()
 
     def decrement_slice(self):
@@ -1993,32 +2033,32 @@ counter_list = [
 
 # Primary frames for displaying objects
 framePlot = Frame(root)
-framePlot.grid(row=0, rowspan=4, column=0)
+framePlot.grid(row=0, rowspan=4, column=0, sticky='n')
 frameScanBox = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
 frameScanBox.grid(row=0, column=1, sticky='ew')
-frameIntensity = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
-frameIntensity.grid(row=1, column=1, sticky='ew')
-frameImages = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
-frameImages.grid(row=2, column=1, sticky='ew')
 frameCentering = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
-frameCentering.grid(row=3, column=1, sticky='ew')
+frameCentering.grid(row=1, column=1, sticky='ew')
+frameIntensity = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
+frameIntensity.grid(row=2, column=1, sticky='ew')
+frameImages = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
+frameImages.grid(row=5, column=1, sticky='nsew')
 framePosition = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
-framePosition.grid(row=4, column=1, sticky='ew')
-frameActions = Frame(root, bd=5, relief=RIDGE, padx=10, pady=10)
-frameActions.grid(row=5, column=1)
+framePosition.grid(row=3, column=1, sticky='nsew')
+frameActions = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
+frameActions.grid(row=4, column=1, sticky='ew')
 frameFiles = Frame(root, width=652, height=123, bd=5, relief=RIDGE, padx=10, pady=5)
 frameFiles.grid(row=4, column=0, sticky='nsew')
-frameOverlays = Frame(root, bd=5, relief=RIDGE, padx=10, pady=5)
-frameOverlays.grid(row=5, column=0)
+frameOverlays = Frame(root, width=652, bd=5, relief=RIDGE, padx=10, pady=5)
+frameOverlays.grid(row=5, column=0, sticky='ew')
 
 # make a drawing area
-fig = plt.figure(figsize=(8, 6))
+fig = plt.figure(figsize=(9, 6.7))
 canvas = FigureCanvasTkAgg(fig, framePlot)
 canvas.get_tk_widget().grid(row=0, column=0)
 toolbar = NavigationToolbar2TkAgg(canvas, framePlot)
 toolbar.grid(row=1, column=0, sticky='ew')
-quit_button = Button(framePlot, text='Quit', command=close_quit, width=15)
-quit_button.grid(row=1, column=0, sticky='s')
+# quit_button = Button(framePlot, text='Quit', command=close_quit, width=15)
+# quit_button.grid(row=1, column=0, sticky='s')
 
 # initialize core data
 core = CoreData()
@@ -2044,5 +2084,6 @@ staff = Staff(root)
 cid = fig.canvas.mpl_connect('button_press_event', onclick)
 root.protocol('WM_DELETE_WINDOW', close_quit)
 staff.popup.protocol('WM_DELETE_WINDOW', hide_window)
+root.update_idletasks()
+action.more_less()
 root.mainloop()
-
