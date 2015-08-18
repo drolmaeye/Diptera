@@ -314,7 +314,6 @@ class ScanActions:
             invalid_entry()
 
     def start_scan(self):
-        pass
         action.abort.set(0)
         # ###make this a static method###
         # clear plot, position info and set dimension
@@ -368,6 +367,10 @@ class ScanActions:
         center.y_plus_pos.set('')
         center.delta_x.set('')
         center.delta_y.set('')
+        center.delta_y_base.set('')
+        center.absolute_x.set('')
+        center.absolute_y.set('')
+        center.absolute_y_base.set('')
         hax.min_pos.set('')
         hax.mid_pos.set('')
         hax.max_pos.set('')
@@ -444,17 +447,15 @@ class ScanActions:
             mFlypco.PositionCompareMaxPosition = abs_fly_max
         mFlypco.PositionCompareStepSize = fly_axis.step_size.get()
         for steps in range(step_npts):
+            if not action.abort.get():
+                print action.abort.get()
+            else:
+                print 'aborted'
+                break
             if step_npts != 1:
-                if not action.abort.get():
-                    step_rel = step_axis.rel_min.get() + steps * step_axis.step_size.get()
-                    step_abs = mStep_ipos + step_rel
-                    mStep.move(step_abs, wait=True)
-                else:
-                    mFlypco.put('PositionCompareMode', 0, wait=True)
-                    mFly.move(mFly_ipos, wait=True)
-                    mStep.move(mStep_ipos, wait=True)
-                    showwarning('Acquisition aborted', '2D scan aborted,\nNo data saved,\nStages returnd to initial positions')
-                    return
+                step_rel = step_axis.rel_min.get() + steps * step_axis.step_size.get()
+                step_abs = mStep_ipos + step_rel
+                mStep.move(step_abs, wait=True)
             mFly.move(fly_zero, wait=True)
             time.sleep(.25)
             mFly.VELO = temp_velo
@@ -470,39 +471,39 @@ class ScanActions:
             mcs.put('LNEOutputWidth', 1e-6, wait=True)
             mcs.NuseAll = fly_axis.npts.get() - 1
             # initialize detector if necessary
-            # ###if image.flag.get():
-            # ###    prefix = image.user_path.get() + image.sample_name.get() + '_'
-            # ###    image_no = image.image_no.get()
-            # ###    suffix = '.tif'
-            # ###    first_filename = prefix + image_no + suffix
-            # ###    print first_filename
-            # ###    if not os.path.isfile(first_filename):
-            # ###        print "is not a file"
-            # ###        pass
-            # ###    else:
-            # ###        while os.path.isfile(first_filename):
-            # ###            incremented_index = str(int(image_no) + 1)
-            # ###            image_no = incremented_index.zfill(3)
-            # ###            first_filename = prefix + image_no + suffix
-            # ###        image.image_no.set(image_no)
-            # ###        overwrite_warn()
-            # ###    detector.AcquirePeriod = scan.exp_time.get()
-            # ###    detector.AcquireTime = scan.exp_time.get() - 0.003
-            # ###    detector.FileName = image.sample_name.get()
-            # ###    detector.TriggerMode = 2
-            # ###    detector.FileNumber = image.image_no.get()
-            # ###    detector.NumImages = fly_axis.npts.get() - 1
-            # ###    detector.Acquire = 1
+            if image.flag.get():
+                prefix = image.user_path.get() + image.sample_name.get() + '_'
+                image_no = image.image_no.get()
+                suffix = '.tif'
+                first_filename = prefix + image_no + suffix
+                print first_filename
+                if not os.path.isfile(first_filename):
+                    print "is not a file"
+                    pass
+                else:
+                    while os.path.isfile(first_filename):
+                        incremented_index = str(int(image_no) + 1)
+                        image_no = incremented_index.zfill(3)
+                        first_filename = prefix + image_no + suffix
+                    image.image_no.set(image_no)
+                    overwrite_warn()
+                detector.AcquirePeriod = scan.exp_time.get()
+                detector.AcquireTime = scan.exp_time.get() - 0.003
+                detector.FileName = image.sample_name.get()
+                detector.TriggerMode = 2
+                detector.FileNumber = image.image_no.get()
+                detector.NumImages = fly_axis.npts.get() - 1
+                detector.Acquire = 1
             # Final actions plus data collection move
             mcs.start()
             mFly.move(fly_final, wait=True)
-            # ###if image.flag.get():
-            # ###    while detector.Acquire:
-            # ###        time.sleep(0.1)
-            # ###    image_number = detector.FileNumber + detector.NumImages - 1
-            # ###    str_image_number = str(image_number)
-            # ###    image.image_no.set(str_image_number.zfill(3))
-            # ###    detector.FileNumber = image_number
+            if image.flag.get():
+                while detector.Acquire:
+                    time.sleep(0.1)
+                image_number = detector.FileNumber + detector.NumImages - 1
+                str_image_number = str(image_number)
+                image.image_no.set(str_image_number.zfill(3))
+                detector.FileNumber = image_number
             # handle data
             TIM_ara = mcs.readmca(1)
             FOE_ara = mcs.readmca(5)
@@ -525,10 +526,10 @@ class ScanActions:
             # try this for not responding, possibly remove
             framePlot.update()
         # recover
-        # ###if image.flag.get():
-        # ###    detector.TriggerMode = 0
-        # ###    detector.NumImages = 1
-        # ###    image.flag.set(0)
+        if image.flag.get():
+            detector.TriggerMode = 0
+            detector.NumImages = 1
+            image.flag.set(0)
         mFlypco.put('PositionCompareMode', 0, wait=True)
         mFly.move(mFly_ipos, wait=True)
         mStep.move(mStep_ipos, wait=True)
@@ -1050,7 +1051,7 @@ class Actions:
         # make and place widgets
         self.button_abort = Button(self.frame, text='Abort',
                                    bg='red', height=2, width=14,
-                                   font=bigfont, command=self.abort)
+                                   font=bigfont, command=self.activate_abort)
         self.button_abort.grid(row=0, column=0, padx=8, pady=20)
         self.button_more = Button(self.frame, text='More', height=2, width=14,
                                   font=bigfont, command=self.more_less)
@@ -1064,8 +1065,8 @@ class Actions:
                                   font=bigfont, command=close_quit)
         self.quit_button.grid(row=0, column=3, padx=8, pady=20)
 
-    def abort(self):
-        action.abort.set(1)
+    def activate_abort(self):
+        self.abort.set(1)
 
     def more_less(self):
         # w = root.winfo_width()
@@ -1776,6 +1777,10 @@ def beamsize_integral():
                                            b=upper_bound, args=t_popt)
 
 
+def path_put(**kwargs):
+    image.det_path.set(detector.get('FilePath_RBV', as_string=True))
+
+
 def update_plot(*args):
     # create a list for iteration
     array_list = [core, over1, over2, over3]
@@ -2011,7 +2016,7 @@ mcs = Struck('16IDB:SIS1:')
 
 bnc = PV('16IDB:cmdReply1_do_IO.AOUT')
 # detector commented out for ioc protection
-# #detector = Device('HP1M-PIL1:cam1:', detector_args)
+detector = Device('HP1M-PIL1:cam1:', detector_args)
 
 # create dictionaries of valid motors, pcos, and counters
 stage_dict = {
@@ -2031,6 +2036,7 @@ counter_list = [
     'FOE ion chamber',
     '50 MHz clock']
 
+detector.add_callback('FilePath_RBV', callback=path_put)
 # Primary frames for displaying objects
 framePlot = Frame(root)
 framePlot.grid(row=0, rowspan=4, column=0, sticky='n')
@@ -2084,6 +2090,7 @@ staff = Staff(root)
 cid = fig.canvas.mpl_connect('button_press_event', onclick)
 root.protocol('WM_DELETE_WINDOW', close_quit)
 staff.popup.protocol('WM_DELETE_WINDOW', hide_window)
+path_put()
 root.update_idletasks()
 action.more_less()
 root.mainloop()
