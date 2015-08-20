@@ -1976,6 +1976,13 @@ def update_plot(*args):
         fly_axis_length = core.FLY.shape[0]
         image_index = yind*fly_axis_length + xind + 1
         data.index.set(image_index)
+        # grid test
+        eh = plt.gca()
+        eh.set_yticks(core.STP, minor=True)
+        eh.set_xticks(core.FLY, minor=True)
+        eh.yaxis.grid(True, which='minor')
+        eh.xaxis.grid(True, which='minor')
+        # test finished, it works, tweak display positions, develop toggle
     plt.gcf().canvas.draw()
     print 'update done'
 
