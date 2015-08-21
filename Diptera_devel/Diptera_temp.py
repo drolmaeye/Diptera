@@ -18,6 +18,7 @@ import numpy as np
 from math import cos, sin, radians, pi, sqrt
 from scipy import exp, integrate
 from scipy.optimize import curve_fit
+import fabio
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 
@@ -735,6 +736,9 @@ class Images:
         self.user_path = StringVar()
         self.sample_name = StringVar()
         self.image_no = StringVar()
+        self.temp_file = StringVar()
+        self.dioptas_flag = IntVar()
+        self.grid_flag = IntVar()
         self.flag.set(0)
         self.user_path.set('P:\\2015-1\\HPCAT\\SXD_test\\')
         self.sample_name.set('test')
@@ -775,6 +779,8 @@ class Images:
         self.button_path_select = Button(self.frame, text='Browse',
                                          command=self.choose_directory)
         self.button_path_select.grid(row=1, column=6, padx=5)
+        self.cbox_activate_dioptas = Checkbutton(self.frame, text='Enable Dioptas', variable=self.dioptas_flag)
+        self.cbox_activate_dioptas.grid(row=3, column=2, padx=5, pady=5)
 
     def choose_directory(self):
         user_dir = askdirectory(title='Select a user directory')
@@ -802,6 +808,28 @@ class Images:
         except ValueError:
             self.image_no.set('001')
             invalid_entry()
+
+    def send_to_dioptas(self):
+        current_directory = self.user_path.get()
+        while not os.path.exists(current_directory):
+            self.choose_directory()
+            current_directory = self.user_path.get()
+        os.chdir(current_directory)
+        filename = self.sample_name.get() + '_' + str(data.index.get()).zfill(3) + '.tif'
+        full_filename = current_directory + filename
+        if not os.path.isfile(full_filename):
+            return
+        if not self.temp_file.get() == '':
+            old_temp = current_directory + self.temp_file.get()
+            if os.path.isfile(old_temp):
+                os.remove(old_temp)
+        temp_image = fabio.open(filename=filename)
+        temp_name = 'temp' + filename
+        self.temp_file.set(temp_name)
+        time.sleep(.5)
+        temp_image.write(temp_name)
+
+
 
 class Centering:
     def __init__(self, master):
@@ -1728,6 +1756,9 @@ def onclick(event):
     fly_axis_length = core.FLY.shape[0]
     image_index = yind*fly_axis_length + xind + 1
     data.index.set(image_index)
+    # start dioptas test
+    if image.dioptas_flag.get():
+        image.send_to_dioptas()
     return hax.mid_pos.set('%.4f' % x_val), vax.mid_pos.set('%.4f' % y_val)
 
 
@@ -1977,11 +2008,12 @@ def update_plot(*args):
         image_index = yind*fly_axis_length + xind + 1
         data.index.set(image_index)
         # grid test
-        eh = plt.gca()
-        eh.set_yticks(core.STP, minor=True)
-        eh.set_xticks(core.FLY, minor=True)
-        eh.yaxis.grid(True, which='minor')
-        eh.xaxis.grid(True, which='minor')
+        if image.grid_flag.get():
+            eh = plt.gca()
+            eh.set_yticks(core.STP, minor=True)
+            eh.set_xticks(core.FLY, minor=True)
+            eh.yaxis.grid(True, which='minor')
+            eh.xaxis.grid(True, which='minor')
         # test finished, it works, tweak display positions, develop toggle
     plt.gcf().canvas.draw()
     print 'update done'
@@ -2070,6 +2102,8 @@ canvas = FigureCanvasTkAgg(fig, framePlot)
 canvas.get_tk_widget().grid(row=0, column=0)
 toolbar = NavigationToolbar2TkAgg(canvas, framePlot)
 toolbar.grid(row=1, column=0, sticky='ew')
+
+
 # quit_button = Button(framePlot, text='Quit', command=close_quit, width=15)
 # quit_button.grid(row=1, column=0, sticky='s')
 
@@ -2094,6 +2128,8 @@ over3 = Overlay(frameOverlays, label='over3')
 staff = Staff(root)
 
 # temporary!!!!
+cbox_enable_grid = Checkbutton(framePlot, text='Grid', variable=image.grid_flag, command=update_plot)
+cbox_enable_grid.grid(row=1, column=0, sticky='s')
 cid = fig.canvas.mpl_connect('button_press_event', onclick)
 root.protocol('WM_DELETE_WINDOW', close_quit)
 staff.popup.protocol('WM_DELETE_WINDOW', hide_window)
