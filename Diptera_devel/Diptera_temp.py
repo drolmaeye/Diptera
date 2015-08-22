@@ -209,9 +209,9 @@ class ScanBox:
         else:
             custom_stage = StringVar()
             popup = Toplevel()
-            xtop = root.winfo_x() + root.winfo_width() / 2 - 150
-            ytop = root.winfo_y() + root.winfo_height() / 2 - 150
-            popup.geometry('300x300+%d+%d' % (xtop, ytop))
+            xtop = root.winfo_x() + root.winfo_width() / 2 - 190
+            ytop = root.winfo_y() + root.winfo_height() / 2 - 180
+            popup.geometry('380x360+%d+%d' % (xtop, ytop))
             popup.title('Custom step stage definition')
             popup.grab_set()
             label_1 = Label(popup, text='Please enter a valid motor prefix')
@@ -221,6 +221,26 @@ class ScanBox:
             entry.bind('<Return>', lambda r: popup.destroy())
             button = Button(popup, text='OK', width=18, command=lambda: popup.destroy())
             button.pack(pady=10)
+            frame_pick = Frame(popup)
+            frame_pick.pack(pady=10)
+            label_quickpick = Label(frame_pick, text='Quick picks')
+            label_quickpick.grid(row=0, column=1, columnspan=2)
+            button_320v_curve = Button(frame_pick, text='320mm VKB Curvature', width=20, command=lambda: custom_stage.set('16IDB:pm15'))
+            button_320v_curve.grid(row=1, column=1, padx=5, pady=5)
+            button_320v_elip = Button(frame_pick, text='320mm VKB Ellipticity', width=20, command=lambda: custom_stage.set('16IDB:pm16'))
+            button_320v_elip.grid(row=2, column=1, padx=5, pady=5)
+            button_320h_curve = Button(frame_pick, text='320mm HKB Curvature', width=20, command=lambda: custom_stage.set('16IDB:pm19'))
+            button_320h_curve.grid(row=3, column=1, padx=5, pady=5)
+            button_320h_elip = Button(frame_pick, text='320mm HKB Ellipticity', width=20, command=lambda: custom_stage.set('16IDB:pm20'))
+            button_320h_elip.grid(row=4, column=1, padx=5, pady=5)
+            button_200v_curve = Button(frame_pick, text='200mm VKB Curvature', width=20, command=lambda: custom_stage.set('16IDB:pm5'))
+            button_200v_curve.grid(row=1, column=2, padx=5, pady=5)
+            button_200v_elip = Button(frame_pick, text='200mm VKB Ellipticity', width=20, command=lambda: custom_stage.set('16IDB:pm6'))
+            button_200v_elip.grid(row=2, column=2, padx=5, pady=5)
+            button_100h_curve = Button(frame_pick, text='100mm HKB Curvature', width=20, command=lambda: custom_stage.set('16IDB:pm3'))
+            button_100h_curve.grid(row=3, column=2, padx=5, pady=5)
+            button_100h_elip = Button(frame_pick, text='100mm HKB Ellipticity', width=20, command=lambda: custom_stage.set('16IDB:pm4'))
+            button_100h_elip.grid(row=4, column=2, padx=5, pady=5)
             entry.focus_set()
             root.wait_window(popup)
             prefix = custom_stage.get()
@@ -780,7 +800,7 @@ class Images:
                                          command=self.choose_directory)
         self.button_path_select.grid(row=1, column=6, padx=5)
         self.cbox_activate_dioptas = Checkbutton(self.frame, text='Enable Dioptas', variable=self.dioptas_flag)
-        self.cbox_activate_dioptas.grid(row=3, column=2, padx=5, pady=5)
+        self.cbox_activate_dioptas.grid(row=3, column=3, padx=5, pady=5)
 
     def choose_directory(self):
         user_dir = askdirectory(title='Select a user directory')
@@ -2128,7 +2148,7 @@ over3 = Overlay(frameOverlays, label='over3')
 staff = Staff(root)
 
 # temporary!!!!
-cbox_enable_grid = Checkbutton(framePlot, text='Grid', variable=image.grid_flag, command=update_plot)
+cbox_enable_grid = Checkbutton(framePlot, text='Overlay 2D Grid', variable=image.grid_flag, command=update_plot)
 cbox_enable_grid.grid(row=1, column=0, sticky='s')
 cid = fig.canvas.mpl_connect('button_press_event', onclick)
 root.protocol('WM_DELETE_WINDOW', close_quit)
