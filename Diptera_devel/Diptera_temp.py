@@ -1580,11 +1580,11 @@ class Staff:
         self.button_move_all.grid(row=1, rowspan=2, column=5, padx=10, pady=5)
 
         # frame_zero widgets
-        self.button_zero_x = Button(self.frame_zero, text='Re-zero x', command=self.zero_x, width=8)
+        self.button_zero_x = Button(self.frame_zero, text='Re-zero x', command=lambda: self.zero_stage(mX), width=8)
         self.button_zero_x.grid(row=0, column=0, padx=10, pady=5)
-        self.button_zero_y = Button(self.frame_zero, text='Re-zero y', command=self.zero_y, width=8)
+        self.button_zero_y = Button(self.frame_zero, text='Re-zero y', command=lambda: self.zero_stage(mY), width=8)
         self.button_zero_y.grid(row=1, column=0, padx=10, pady=5)
-        self.button_zero_z = Button(self.frame_zero, text='Re-zero z', command=self.zero_z, width=8)
+        self.button_zero_z = Button(self.frame_zero, text='Re-zero z', command=lambda: self.zero_stage(mZ), width=8)
         self.button_zero_z.grid(row=2, column=0, padx=10, pady=5)
 
         # hide window on startup
@@ -1640,29 +1640,14 @@ class Staff:
         self.pv_asymmetry.set('%.2f' % asym)
         self.pv_fwhm.set('%.4f' % fwhm)
 
-
-    # Make these three one function using lambdas above to pass argument!!!
-    def zero_x(self):
+    def zero_stage(self, stage):
         confirm = askyesno('Confirm action', 'Are you sure you want to proceed?')
         if confirm:
-            print 'I would move!'
-        else:
-            print 'I would not move'
-        # ###mX.SET = 1
-        # ###mX.VAL = 0
-        # ###mX.SET = 0
-
-    def zero_y(self):
-        pass
-        # ###mY.SET = 1
-        # ###mY.VAL = 0
-        # ###mY.SET = 0
-
-    def zero_z(self):
-        pass
-        # ###mZ.SET = 1
-        # ###mZ.VAL = 0
-        # ###mZ.SET = 0
+            print stage.RBV
+            pass
+            # ###stage.SET = 1
+            # ###stage.VAL = 0
+            # ###stage.SET = 0
 
 
 class DragHorizontalLines:
