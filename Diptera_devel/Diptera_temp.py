@@ -1152,6 +1152,7 @@ class DataLoad:
         self.current_slice = IntVar()
         self.current_slice.set(1)
         self.index = IntVar()
+        self.button_load = IntVar()
 
         # make and place widgets
         self.head_label = Label(self.frame, text='FILE CONTROL')
@@ -1164,6 +1165,10 @@ class DataLoad:
         self.button_cfile.grid(row=1, column=5, padx=5, pady=5)
         self.button_csave = Button(self.frame, text='Save ASCII', command=self.save_ascii, width=11)
         self.button_csave.grid(row=1, column=6, padx=5, pady=5)
+        self.button_downfile = Button(self.frame, text='<', command=self.decrement_file)
+        self.button_downfile.grid(row=1, column=7, padx=5, pady=5)
+        self.button_upfile = Button(self.frame, text='>', command=self.increment_file)
+        self.button_upfile.grid(row=1, column=8, padx=5, pady=5)
         self.cbox_slice_flag = Checkbutton(self.frame, text='2D Slice',
                                            variable=self.slice_flag,
                                            command=self.activate_slice)
@@ -1181,25 +1186,29 @@ class DataLoad:
         self.display_index = Label(self.frame, textvariable=self.index, width=5, relief=SUNKEN)
         self.display_index.grid(row=2, column=5)
 
-
     def load_data(self):
-        old_data = data.current_file.get()
-        if not old_data == '':
-            old_dir = os.path.dirname(old_data)
-            if os.path.exists(old_dir):
-                data_file = askopenfilename(initialdir=old_dir)
+        if not self.button_load.get():
+            old_data = data.current_file.get()
+            if not old_data == '':
+                old_dir = os.path.dirname(old_data)
+                if os.path.exists(old_dir):
+                    data_file = askopenfilename(initialdir=old_dir)
+                else:
+                    data_file = askopenfilename()
             else:
                 data_file = askopenfilename()
+            try:
+                if os.path.isfile(data_file):
+                    cdata = np.load(data_file)
+                else:
+                    raise IOError
+            except IOError:
+                path_warn()
+                return
         else:
-            data_file = askopenfilename()
-        try:
-            if os.path.isfile(data_file):
-                cdata = np.load(data_file)
-            else:
-                raise IOError
-        except IOError:
-            path_warn()
-            return
+            data_file = data.current_file.get()
+            cdata = np.load(data_file)
+            self.button_load.set(0)
         center.c_flag.set(0)
         data.slice_flag.set(0)
         data.current_slice.set(1)
@@ -1257,6 +1266,34 @@ class DataLoad:
         np.savetxt(textfile, core.FLY, fmt='%6.4f', delimiter=', ', header=horizontal, footer='\n', comments='')
         np.savetxt(textfile, core.SCA, fmt='%.10e', delimiter=', ', header='Scaled Intensity', footer='End scan data' + '\n' * 2, comments='')
         textfile.close()
+
+    def decrement_file(self):
+        current_file = data.current_file.get()
+        if current_file == '':
+            return
+        cpath, cfile = os.path.split(current_file)[0], os.path.split(current_file)[1]
+        current_number = int(cfile[6:-4])
+        new_file = cpath + '/fScan_' + str(current_number - 1) + '.npz'
+        print new_file
+        if os.path.isfile(new_file):
+            print 'made it here'
+            data.current_file.set(new_file)
+            self.button_load.set(1)
+            self.load_data()
+
+    def increment_file(self):
+        current_file = data.current_file.get()
+        if current_file == '':
+            return
+        cpath, cfile = os.path.split(current_file)[0], os.path.split(current_file)[1]
+        current_number = int(cfile[6:-4])
+        new_file = cpath + '/fScan_' + str(current_number + 1) + '.npz'
+        print new_file
+        if os.path.isfile(new_file):
+            print 'made it here'
+            data.current_file.set(new_file)
+            self.button_load.set(1)
+            self.load_data()
 
     def activate_slice(self):
         if core.dimension == 1:
@@ -1482,7 +1519,6 @@ class Staff:
         self.head_fwhm.grid(row=0, column=7)
         self.head_fraction = Label(self.frame_fit, text='Beam fraction')
         self.head_fraction.grid(row=0, column=8)
-
 
         # define and place frame_fit widgets
         self.cbox_focus_flag = Checkbutton(self.frame_fit, text='Focus fit',
