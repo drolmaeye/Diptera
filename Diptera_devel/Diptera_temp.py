@@ -1643,11 +1643,9 @@ class Staff:
     def zero_stage(self, stage):
         confirm = askyesno('Confirm action', 'Are you sure you want to proceed?')
         if confirm:
-            print stage.RBV
-            pass
-            # ###stage.SET = 1
-            # ###stage.VAL = 0
-            # ###stage.SET = 0
+            stage.SET = 1
+            stage.VAL = 0
+            stage.SET = 0
 
 
 class DragHorizontalLines:
