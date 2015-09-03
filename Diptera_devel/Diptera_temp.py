@@ -335,6 +335,7 @@ class ScanActions:
             invalid_entry()
 
     def start_scan(self):
+        t_zero = time.clock()
         action.abort.set(0)
         # ###make this a static method###
         # clear plot, position info and set dimension
@@ -572,6 +573,8 @@ class ScanActions:
             data.current_slice.set(1)
             data.slice_flag.set(1)
             update_plot()
+        t_elapsed = time.clock() - t_zero
+        print t_elapsed
 
 
 class Counters:
