@@ -2,18 +2,23 @@ __author__ = 'j.smith'
 
 '''
 A GUI for creating, reading, and graphing flyscan (1d or 2d) files
+
+Devel version test for github!! 2 August 2015
 '''
 
 # import necessary modules
 from Tkinter import *
-from ttk import Combobox
 from tkMessageBox import *
 from tkFileDialog import *
+import tkFont
 import os.path
 from epics import *
 from epics.devices import Struck
 import numpy as np
-from math import cos, sin, radians
+from math import cos, sin, radians, pi, sqrt
+from scipy import exp, integrate
+from scipy.optimize import curve_fit
+import fabio
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 
@@ -45,6 +50,9 @@ class CoreData:
         self.dvls = []
         # define dimension and specify default
         self.dimension = 11
+        # plot flag that cannot be turned off (for now)
+        self.plot_flag = IntVar()
+        self.plot_flag.set(1)
 
 
 class ScanBox:
@@ -179,14 +187,17 @@ class ScanBox:
         size = (f - i) / (p - 1)
         if self == fly_axis:
             msize = size*10000
+            # print msize
             quotient = divmod(msize, 5)
-            # ###if quotient[0] >= 0:
-            # ###    fly_axis.flag.set(1)
-            # ###    fly_axis.led.config(state=NORMAL)
-            # test 0.1 micron step
-            if quotient[0] > 0.5 and round(quotient[1], 5) == 0:
+            # print quotient
+            if quotient[0] >= 1 and round(quotient[1], 5) == 0:
                 fly_axis.flag.set(1)
                 fly_axis.led.config(state=NORMAL)
+                # print 'normal'
+            elif quotient[0] == 0 and round(quotient[1], 0) == msize:
+                fly_axis.flag.set(1)
+                fly_axis.led.config(state=NORMAL)
+                # print 'special'
             else:
                 fly_axis.flag.set(0)
                 fly_axis.led.config(state=DISABLED)
@@ -198,9 +209,9 @@ class ScanBox:
         else:
             custom_stage = StringVar()
             popup = Toplevel()
-            xtop = root.winfo_x() + root.winfo_width() / 2 - 150
-            ytop = root.winfo_y() + root.winfo_height() / 2 - 150
-            popup.geometry('300x300+%d+%d' % (xtop, ytop))
+            xtop = root.winfo_x() + root.winfo_width() / 2 - 190
+            ytop = root.winfo_y() + root.winfo_height() / 2 - 180
+            popup.geometry('380x360+%d+%d' % (xtop, ytop))
             popup.title('Custom step stage definition')
             popup.grab_set()
             label_1 = Label(popup, text='Please enter a valid motor prefix')
@@ -210,6 +221,26 @@ class ScanBox:
             entry.bind('<Return>', lambda r: popup.destroy())
             button = Button(popup, text='OK', width=18, command=lambda: popup.destroy())
             button.pack(pady=10)
+            frame_pick = Frame(popup)
+            frame_pick.pack(pady=10)
+            label_quickpick = Label(frame_pick, text='Quick picks')
+            label_quickpick.grid(row=0, column=1, columnspan=2)
+            button_320v_curve = Button(frame_pick, text='320mm VKB Curvature', width=20, command=lambda: custom_stage.set('16IDB:pm15'))
+            button_320v_curve.grid(row=1, column=1, padx=5, pady=5)
+            button_320v_elip = Button(frame_pick, text='320mm VKB Ellipticity', width=20, command=lambda: custom_stage.set('16IDB:pm16'))
+            button_320v_elip.grid(row=2, column=1, padx=5, pady=5)
+            button_320h_curve = Button(frame_pick, text='320mm HKB Curvature', width=20, command=lambda: custom_stage.set('16IDB:pm19'))
+            button_320h_curve.grid(row=3, column=1, padx=5, pady=5)
+            button_320h_elip = Button(frame_pick, text='320mm HKB Ellipticity', width=20, command=lambda: custom_stage.set('16IDB:pm20'))
+            button_320h_elip.grid(row=4, column=1, padx=5, pady=5)
+            button_200v_curve = Button(frame_pick, text='200mm VKB Curvature', width=20, command=lambda: custom_stage.set('16IDB:pm5'))
+            button_200v_curve.grid(row=1, column=2, padx=5, pady=5)
+            button_200v_elip = Button(frame_pick, text='200mm VKB Ellipticity', width=20, command=lambda: custom_stage.set('16IDB:pm6'))
+            button_200v_elip.grid(row=2, column=2, padx=5, pady=5)
+            button_100h_curve = Button(frame_pick, text='100mm HKB Curvature', width=20, command=lambda: custom_stage.set('16IDB:pm3'))
+            button_100h_curve.grid(row=3, column=2, padx=5, pady=5)
+            button_100h_elip = Button(frame_pick, text='100mm HKB Ellipticity', width=20, command=lambda: custom_stage.set('16IDB:pm4'))
+            button_100h_elip.grid(row=4, column=2, padx=5, pady=5)
             entry.focus_set()
             root.wait_window(popup)
             prefix = custom_stage.get()
@@ -222,7 +253,6 @@ class ScanBox:
                 return
             name = step_axis.mCustom.description
             self.axis.set(name)
-
 
     def min_validate(self, event):
         try:
@@ -268,7 +298,6 @@ class ScanBox:
             invalid_entry()
 
 
-
 class ScanActions:
     def __init__(self, master):
         self.frame = Frame(master)
@@ -306,6 +335,8 @@ class ScanActions:
             invalid_entry()
 
     def start_scan(self):
+        t_zero = time.clock()
+        action.abort.set(0)
         # ###make this a static method###
         # clear plot, position info and set dimension
         while step_axis.scan_directory.get() == 'Select directory before scan':
@@ -358,6 +389,10 @@ class ScanActions:
         center.y_plus_pos.set('')
         center.delta_x.set('')
         center.delta_y.set('')
+        center.delta_y_base.set('')
+        center.absolute_x.set('')
+        center.absolute_y.set('')
+        center.absolute_y_base.set('')
         hax.min_pos.set('')
         hax.mid_pos.set('')
         hax.max_pos.set('')
@@ -402,6 +437,25 @@ class ScanActions:
         abs_fly_max = mFly_ipos + fly_axis.rel_max.get()
         fly_zero = abs_fly_min - temp_velo * mW.ACCL * 1.5
         fly_final = abs_fly_max + temp_velo * mW.ACCL * 1.5
+        # limit check
+        step_zero = mStep_ipos + step_axis.rel_min.get()
+        step_final = mStep_ipos + step_axis.rel_max.get()
+        fll = mFly.within_limits(fly_zero)
+        fhl = mFly.within_limits(fly_final)
+        sll = mStep.within_limits(step_zero)
+        shl = mStep.within_limits(step_final)
+        limit_check = False
+        if not step_axis.flag.get():
+            if fll and fhl:
+                limit_check = True
+        else:
+            if fll and fhl and sll and shl:
+                limit_check = True
+        if limit_check:
+            pass
+        else:
+            showwarning('Limit Check Failed', 'One or more stage target(s) exceed limits')
+            return
         # set up pco
         mFlypco.put('PositionCompareMode', 1, wait=True)
         mFlypco.put('PositionComparePulseWidth', 1, wait=True)
@@ -415,6 +469,11 @@ class ScanActions:
             mFlypco.PositionCompareMaxPosition = abs_fly_max
         mFlypco.PositionCompareStepSize = fly_axis.step_size.get()
         for steps in range(step_npts):
+            if not action.abort.get():
+                print action.abort.get()
+            else:
+                print 'aborted'
+                break
             if step_npts != 1:
                 step_rel = step_axis.rel_min.get() + steps * step_axis.step_size.get()
                 step_abs = mStep_ipos + step_rel
@@ -434,39 +493,39 @@ class ScanActions:
             mcs.put('LNEOutputWidth', 1e-6, wait=True)
             mcs.NuseAll = fly_axis.npts.get() - 1
             # initialize detector if necessary
-            # ###if image.flag.get():
-            # ###    prefix = image.user_path.get() + image.sample_name.get() + '_'
-            # ###    image_no = image.image_no.get()
-            # ###    suffix = '.tif'
-            # ###    first_filename = prefix + image_no + suffix
-            # ###    print first_filename
-            # ###    if not os.path.isfile(first_filename):
-            # ###        print "is not a file"
-            # ###        pass
-            # ###    else:
-            # ###        while os.path.isfile(first_filename):
-            # ###            incremented_index = str(int(image_no) + 1)
-            # ###            image_no = incremented_index.zfill(3)
-            # ###            first_filename = prefix + image_no + suffix
-            # ###        image.image_no.set(image_no)
-            # ###        overwrite_warn()
-            # ###    detector.AcquirePeriod = scan.exp_time.get()
-            # ###    detector.AcquireTime = scan.exp_time.get() - 0.003
-            # ###    detector.FileName = image.sample_name.get()
-            # ###    detector.TriggerMode = 2
-            # ###    detector.FileNumber = image.image_no.get()
-            # ###    detector.NumImages = fly_axis.npts.get() - 1
-            # ###    detector.Acquire = 1
+            if image.flag.get():
+                prefix = image.user_path.get() + image.sample_name.get() + '_'
+                image_no = image.image_no.get()
+                suffix = '.tif'
+                first_filename = prefix + image_no + suffix
+                print first_filename
+                if not os.path.isfile(first_filename):
+                    print "is not a file"
+                    pass
+                else:
+                    while os.path.isfile(first_filename):
+                        incremented_index = str(int(image_no) + 1)
+                        image_no = incremented_index.zfill(3)
+                        first_filename = prefix + image_no + suffix
+                    image.image_no.set(image_no)
+                    overwrite_warn()
+                detector.AcquirePeriod = scan.exp_time.get()
+                detector.AcquireTime = scan.exp_time.get() - 0.003
+                detector.FileName = image.sample_name.get()
+                detector.TriggerMode = 2
+                detector.FileNumber = image.image_no.get()
+                detector.NumImages = fly_axis.npts.get() - 1
+                detector.Acquire = 1
             # Final actions plus data collection move
             mcs.start()
             mFly.move(fly_final, wait=True)
-            # ###if image.flag.get():
-            # ###    while detector.Acquire:
-            # ###        time.sleep(0.1)
-            # ###    image_number = detector.FileNumber + detector.NumImages - 1
-            # ###    str_image_number = str(image_number)
-            # ###    image.image_no.set(str_image_number.zfill(3))
-            # ###    detector.FileNumber = image_number
+            if image.flag.get():
+                while detector.Acquire:
+                    time.sleep(0.1)
+                image_number = detector.FileNumber + detector.NumImages - 1
+                str_image_number = str(image_number)
+                image.image_no.set(str_image_number.zfill(3))
+                detector.FileNumber = image_number
             # handle data
             TIM_ara = mcs.readmca(1)
             FOE_ara = mcs.readmca(5)
@@ -489,10 +548,10 @@ class ScanActions:
             # try this for not responding, possibly remove
             framePlot.update()
         # recover
-        # ###if image.flag.get():
-        # ###    detector.TriggerMode = 0
-        # ###    detector.NumImages = 1
-        # ###    image.flag.set(0)
+        if image.flag.get():
+            detector.TriggerMode = 0
+            detector.NumImages = 1
+            image.flag.set(0)
         mFlypco.put('PositionCompareMode', 0, wait=True)
         mFly.move(mFly_ipos, wait=True)
         mStep.move(mStep_ipos, wait=True)
@@ -509,10 +568,13 @@ class ScanActions:
                  rmd=core.RMD)
         new_index = str(int(index) + 1)
         step_axis.scan_no.set(new_index.zfill(3))
+        step_axis.flag.set(0)
         if center.c_flag.get():
             data.current_slice.set(1)
             data.slice_flag.set(1)
             update_plot()
+        t_elapsed = time.clock() - t_zero
+        print t_elapsed
 
 
 class Counters:
@@ -532,6 +594,12 @@ class Counters:
         self.scale.set(1.0)
         self.data_type_list = ['Counts', 'Derivative']
         self.data_type.set(self.data_type_list[0])
+        self.max_scale = IntVar()
+        self.min_scale = IntVar()
+        self.levels = IntVar()
+        self.max_scale.set(100)
+        self.min_scale.set(0)
+        self.levels.set(64)
 
         # setup trace on relevant values
         self.ref_flag.trace('w', update_plot)
@@ -548,6 +616,8 @@ class Counters:
         self.head_scale.grid(row=0, column=4)
         self.head_time = Label(self.frame, text='Data type', width=16)
         self.head_time.grid(row=0, column=5)
+        self.head_2d_scaling = Label(self.frame, text='----2D scaling----')
+        self.head_2d_scaling.grid(row=0, column=6, columnspan=4)
 
         # define and place widgets
         self.check_ref_flag = Checkbutton(self.frame, variable=self.ref_flag)
@@ -568,8 +638,28 @@ class Counters:
         self.entry_scale.bind('<Return>', self.scale_validate)
         self.entry_data_type = OptionMenu(self.frame, self.data_type, *self.data_type_list)
         self.entry_data_type.grid(row=1, rowspan=2, column=5, padx=0)
-        self.button_update = Button(self.frame, text='Update plot', command=update_plot)
-        self.button_update.grid(row=1, rowspan=2, column=6, padx=0)
+        # self.button_update = Button(self.frame, text='Update plot', command=update_plot)
+        # self.button_update.grid(row=1, rowspan=2, column=6, padx=0)
+        self.entry_max_scale = Entry(self.frame, textvariable=self.max_scale, width=4)
+        self.entry_max_scale.grid(row=1, column=7, padx=5, pady=5)
+        self.entry_max_scale.bind('<FocusOut>', self.max_scale_validate)
+        self.entry_max_scale.bind('<Return>', self.max_scale_validate)
+        self.button_down_max = Button(self.frame, text='<', command=self.decrement_max)
+        self.button_down_max.grid(row=1, column=6, pady=5)
+        self.button_up_max = Button(self.frame, text='>', command=self.increment_max)
+        self.button_up_max.grid(row=1, column=8, pady=5)
+        self.entry_min_scale = Entry(self.frame, textvariable=self.min_scale, width=4)
+        self.entry_min_scale.grid(row=2, column=7, padx=5, pady=5)
+        self.entry_min_scale.bind('<FocusOut>', self.min_scale_validate)
+        self.entry_min_scale.bind('<Return>', self.min_scale_validate)
+        self.button_down_min = Button(self.frame, text='<', command=self.decrement_min)
+        self.button_down_min.grid(row=2, column=6, pady=5)
+        self.button_up_min = Button(self.frame, text='>', command=self.increment_min)
+        self.button_up_min.grid(row=2, column=8, pady=5)
+        self.entry_levels = Entry(self.frame, textvariable=self.levels, width=4)
+        self.entry_levels.grid(row=1, rowspan=2, column=9, padx=10, pady=5)
+        self.entry_levels.bind('<FocusOut>', self.levels_validate)
+        self.entry_levels.bind('<Return>', self.levels_validate)
 
     def scale_validate(self, event):
         # allow negative numbers for now
@@ -581,6 +671,81 @@ class Counters:
             self.scale.set(1.0)
             update_plot()
             invalid_entry()
+
+    def max_scale_validate(self, event):
+        try:
+            val = self.max_scale.get()
+            isinstance(val, int)
+            if self.min_scale.get() < val <= 100:
+                update_plot()
+            else:
+                raise ValueError
+        except ValueError:
+            self.max_scale.set(100)
+            update_plot()
+            invalid_entry()
+
+    def min_scale_validate(self, event):
+        try:
+            val = self.min_scale.get()
+            isinstance(val, int)
+            if 0 <= val < self.max_scale.get():
+                update_plot()
+            else:
+                raise ValueError
+        except ValueError:
+            self.min_scale.set(0)
+            update_plot()
+            invalid_entry()
+
+    def levels_validate(self, event):
+        try:
+            val = self.levels.get()
+            isinstance(val, int)
+            if 4 <= val <= 128:
+                update_plot()
+            else:
+                raise ValueError
+        except ValueError:
+            self.levels.set(64)
+            update_plot()
+            invalid_entry()
+
+    def decrement_max(self):
+        old_max = self.max_scale.get()
+        new_max = old_max - 1
+        if new_max > self.min_scale.get():
+            self.max_scale.set(new_max)
+            update_plot()
+        else:
+            pass
+
+    def increment_max(self):
+        old_max = self.max_scale.get()
+        new_max = old_max + 1
+        if new_max <= 100:
+            self.max_scale.set(new_max)
+            update_plot()
+        else:
+            pass
+
+    def decrement_min(self):
+        old_min = self.min_scale.get()
+        new_min = old_min - 1
+        if new_min >= 0:
+            self.min_scale.set(new_min)
+            update_plot()
+        else:
+            pass
+
+    def increment_min(self):
+        old_min = self.min_scale.get()
+        new_min = old_min + 1
+        if new_min < self.max_scale.get():
+            self.min_scale.set(new_min)
+            update_plot()
+        else:
+            pass
 
 
 class Images:
@@ -594,6 +759,9 @@ class Images:
         self.user_path = StringVar()
         self.sample_name = StringVar()
         self.image_no = StringVar()
+        self.temp_file = StringVar()
+        self.dioptas_flag = IntVar()
+        self.grid_flag = IntVar()
         self.flag.set(0)
         self.user_path.set('P:\\2015-1\\HPCAT\\SXD_test\\')
         self.sample_name.set('test')
@@ -634,6 +802,8 @@ class Images:
         self.button_path_select = Button(self.frame, text='Browse',
                                          command=self.choose_directory)
         self.button_path_select.grid(row=1, column=6, padx=5)
+        self.cbox_activate_dioptas = Checkbutton(self.frame, text='Enable Dioptas', variable=self.dioptas_flag)
+        self.cbox_activate_dioptas.grid(row=3, column=3, padx=5, pady=5)
 
     def choose_directory(self):
         user_dir = askdirectory(title='Select a user directory')
@@ -662,6 +832,28 @@ class Images:
             self.image_no.set('001')
             invalid_entry()
 
+    def send_to_dioptas(self):
+        current_directory = self.user_path.get()
+        while not os.path.exists(current_directory):
+            self.choose_directory()
+            current_directory = self.user_path.get()
+        os.chdir(current_directory)
+        filename = self.sample_name.get() + '_' + str(data.index.get()).zfill(3) + '.tif'
+        full_filename = current_directory + filename
+        if not os.path.isfile(full_filename):
+            return
+        if not self.temp_file.get() == '':
+            old_temp = current_directory + self.temp_file.get()
+            if os.path.isfile(old_temp):
+                os.remove(old_temp)
+        temp_image = fabio.open(filename=filename)
+        temp_name = 'temp' + filename
+        self.temp_file.set(temp_name)
+        time.sleep(.5)
+        temp_image.write(temp_name)
+
+
+
 class Centering:
     def __init__(self, master):
         self.frame = Frame(master)
@@ -674,8 +866,15 @@ class Centering:
         self.y_center_pos = StringVar()
         self.y_plus_pos = StringVar()
         self.delta_x = StringVar()
+        self.absolute_x = StringVar()
         self.delta_y = StringVar()
+        self.absolute_y = StringVar()
+        self.delta_y_base = StringVar()
+        self.absolute_y_base = StringVar()
         self.delta_w.set(2.0)
+
+        # set up trace on c_flag to verify buttons are disabled
+        self.c_flag.trace('w', self.disable_move_buttons)
 
         # make and place column headings
         self.head_center = Label(self.frame, text='CENTERING CONTROL')
@@ -692,6 +891,8 @@ class Centering:
         self.head_delta_x.grid(row=0, column=6)
         self.head_delta_y = Label(self.frame, text='y correction')
         self.head_delta_y.grid(row=0, column=7)
+        self.head_absolute_x = Label(self.frame, text='Final target position ->')
+        self.head_absolute_x.grid(row=2, column=4, columnspan=2)
 
         # make and place widgets
         self.cbox_c_flag = Checkbutton(self.frame, text='Enable', variable=self.c_flag)
@@ -704,35 +905,60 @@ class Centering:
         self.label_y_center.grid(row=1, column=4, padx=5, pady=5)
         self.label_y_plus = Label(self.frame, textvariable=self.y_plus_pos, relief=SUNKEN, width=8)
         self.label_y_plus.grid(row=1, column=5, padx=5, pady=5)
-        self.button_delta_x = Button(self.frame, textvariable=self.delta_x, command=self.move_x, width=7)
-        self.button_delta_x.grid(row=1, column=6, padx=5, pady=5)
-        self.button_delta_x.config(state=DISABLED)
+        self.label_delta_x = Label(self.frame, textvariable=self.delta_x, relief=SUNKEN, width=8)
+        self.label_delta_x.grid(row=1, column=6, padx=5, pady=5)
         self.label_delta_y = Label(self.frame, textvariable=self.delta_y, relief=SUNKEN, width=8)
         self.label_delta_y.grid(row=1, column=7, padx=5, pady=5)
+        self.button_absolute_x = Button(self.frame, textvariable=self.absolute_x, command=self.move_x, width=7)
+        self.button_absolute_x.grid(row=2, column=6, padx=5, pady=5)
+        self.button_absolute_x.config(state=DISABLED)
 
     def calc_deltas(self):
         if not center.y_minus_pos.get() or not center.y_center_pos.get() or not center.y_plus_pos.get():
             return
         else:
-            center.button_delta_x.config(state=NORMAL, background='green')
+            center.button_absolute_x.config(state=NORMAL, background='green')
+            staff.button_move_all.config(state=NORMAL, background='green')
             dsx_plus = float(center.y_plus_pos.get()) - float(center.y_center_pos.get())
             dsx_minus = float(center.y_minus_pos.get()) - float(center.y_center_pos.get())
-            delta_y = (dsx_plus + dsx_minus)/2/(cos(radians(center.delta_w.get()))-1)
             delta_x = (dsx_plus - dsx_minus)/2/(sin(radians(center.delta_w.get())))
-            center.delta_y.set('%.4f' % delta_y)
+            delta_y = (dsx_plus + dsx_minus)/2/(cos(radians(center.delta_w.get()))-1)
+            delta_y_base = -delta_y
+            abs_x = mX.RBV + delta_x
+            abs_y = mY.RBV + delta_y
+            abs_base = mYbase.RBV - delta_y
             center.delta_x.set('%.4f' % delta_x)
+            center.delta_y.set('%.4f' % delta_y)
+            center.delta_y_base.set('%.4f' % delta_y_base)
+            center.absolute_x.set('%.4f' % abs_x)
+            center.absolute_y.set('%.4f' % abs_y)
+            center.absolute_y_base.set('%.4f' % abs_base)
 
     def move_x(self):
         try:
-            val = float(center.delta_x.get())
+            abs_x = float(self.absolute_x.get())
         except ValueError:
             return
-        i_pos = mX.RBV
-        f_pos = i_pos + val
-        mX.move(f_pos, wait=True)
-        center.button_delta_x.config(state=DISABLED, background='SystemButtonFace')
-        center.c_flag.set(0)
-        step_axis.flag.set(0)
+        mX.move(abs_x, wait=True)
+        self.c_flag.set(0)
+
+    def move_all(self):
+        try:
+            abs_x = float(self.absolute_x.get())
+            abs_y = float(self.absolute_y.get())
+            abs_base = float(self.absolute_y_base.get())
+        except ValueError:
+            return
+        mX.move(abs_x, wait=True)
+        mY.move(abs_y, wait=True)
+        mYbase.move(abs_base, wait=True)
+        self.c_flag.set(0)
+
+    def disable_move_buttons(self, *args):
+        if not self.c_flag.get():
+            self.button_absolute_x.config(state=DISABLED, background='SystemButtonFace')
+            staff.button_move_all.config(state=DISABLED, background='SystemButtonFace')
+
 
 
 class Position:
@@ -854,6 +1080,70 @@ class Position:
             return
 
 
+class Actions:
+    """
+    Big buttons that initiate data collection
+    """
+
+    def __init__(self, master):
+        """
+        :param master: frame for inserting widgets
+        """
+        self.frame = Frame(master, padx=10, pady=5)
+        self.frame.pack()
+
+        # define variables
+        self.abort = IntVar()
+        self.abort.set(0)
+
+        # make big font
+        bigfont = tkFont.Font(size=10, weight='bold')
+
+        # make and place widgets
+        self.button_abort = Button(self.frame, text='Abort',
+                                   bg='red', height=2, width=14,
+                                   font=bigfont, command=self.activate_abort)
+        self.button_abort.grid(row=0, column=0, padx=8, pady=20)
+        self.button_more = Button(self.frame, text='More', height=2, width=14,
+                                  font=bigfont, command=self.more_less)
+        self.button_more.grid(row=0, column=1, padx=8, pady=20)
+        self.button_staff = Button(self.frame,
+                                   text='Alignment',
+                                   height=2, width=14, font=bigfont,
+                                   command=self.open_staff)
+        self.button_staff.grid(row=0, column=2, padx=8, pady=20)
+        self.quit_button = Button(self.frame, text='Quit', height=2, width=14,
+                                  font=bigfont, command=close_quit)
+        self.quit_button.grid(row=0, column=3, padx=8, pady=20)
+
+    def activate_abort(self):
+        self.abort.set(1)
+
+    def more_less(self):
+        # w = root.winfo_width()
+        w = 1351
+        h = root.winfo_height()
+        x = root.winfo_x()
+        y = root.winfo_y()
+        # print w, h, x, y
+        if h > 800:
+            h = 712
+            image.flag.set(0)
+            over1.plot_flag.set(0)
+            over2.plot_flag.set(0)
+            over3.plot_flag.set(0)
+            action.button_more.configure(text='More')
+            if data.current_file.get():
+                update_plot()
+        else:
+            h = 871
+            action.button_more.configure(text='Less')
+        root.geometry('%dx%d+%d+%d' % (w, h, x, y))
+
+    def open_staff(self):
+        staff.popup.deiconify()
+
+
 class DataLoad:
     def __init__(self, master):
         self.frame = Frame(master)
@@ -865,6 +1155,7 @@ class DataLoad:
         self.current_slice = IntVar()
         self.current_slice.set(1)
         self.index = IntVar()
+        self.button_load = IntVar()
 
         # make and place widgets
         self.head_label = Label(self.frame, text='FILE CONTROL')
@@ -877,6 +1168,10 @@ class DataLoad:
         self.button_cfile.grid(row=1, column=5, padx=5, pady=5)
         self.button_csave = Button(self.frame, text='Save ASCII', command=self.save_ascii, width=11)
         self.button_csave.grid(row=1, column=6, padx=5, pady=5)
+        self.button_downfile = Button(self.frame, text='<', command=self.decrement_file)
+        self.button_downfile.grid(row=1, column=7, padx=5, pady=5)
+        self.button_upfile = Button(self.frame, text='>', command=self.increment_file)
+        self.button_upfile.grid(row=1, column=8, padx=5, pady=5)
         self.cbox_slice_flag = Checkbutton(self.frame, text='2D Slice',
                                            variable=self.slice_flag,
                                            command=self.activate_slice)
@@ -894,25 +1189,29 @@ class DataLoad:
         self.display_index = Label(self.frame, textvariable=self.index, width=5, relief=SUNKEN)
         self.display_index.grid(row=2, column=5)
 
-
     def load_data(self):
-        old_data = data.current_file.get()
-        if not old_data == '':
-            old_dir = os.path.dirname(old_data)
-            if os.path.exists(old_dir):
-                data_file = askopenfilename(initialdir=old_dir)
+        if not self.button_load.get():
+            old_data = data.current_file.get()
+            if not old_data == '':
+                old_dir = os.path.dirname(old_data)
+                if os.path.exists(old_dir):
+                    data_file = askopenfilename(initialdir=old_dir)
+                else:
+                    data_file = askopenfilename()
             else:
                 data_file = askopenfilename()
+            try:
+                if os.path.isfile(data_file):
+                    cdata = np.load(data_file)
+                else:
+                    raise IOError
+            except IOError:
+                path_warn()
+                return
         else:
-            data_file = askopenfilename()
-        try:
-            if os.path.isfile(data_file):
-                cdata = np.load(data_file)
-            else:
-                raise IOError
-        except IOError:
-            path_warn()
-            return
+            data_file = data.current_file.get()
+            cdata = np.load(data_file)
+            self.button_load.set(0)
         center.c_flag.set(0)
         data.slice_flag.set(0)
         data.current_slice.set(1)
@@ -971,6 +1270,34 @@ class DataLoad:
         np.savetxt(textfile, core.SCA, fmt='%.10e', delimiter=', ', header='Scaled Intensity', footer='End scan data' + '\n' * 2, comments='')
         textfile.close()
 
+    def decrement_file(self):
+        current_file = data.current_file.get()
+        if current_file == '':
+            return
+        cpath, cfile = os.path.split(current_file)[0], os.path.split(current_file)[1]
+        current_number = int(cfile[6:-4])
+        new_file = cpath + '/fScan_' + str(current_number - 1) + '.npz'
+        print new_file
+        if os.path.isfile(new_file):
+            print 'made it here'
+            data.current_file.set(new_file)
+            self.button_load.set(1)
+            self.load_data()
+
+    def increment_file(self):
+        current_file = data.current_file.get()
+        if current_file == '':
+            return
+        cpath, cfile = os.path.split(current_file)[0], os.path.split(current_file)[1]
+        current_number = int(cfile[6:-4])
+        new_file = cpath + '/fScan_' + str(current_number + 1) + '.npz'
+        print new_file
+        if os.path.isfile(new_file):
+            print 'made it here'
+            data.current_file.set(new_file)
+            self.button_load.set(1)
+            self.load_data()
+
     def activate_slice(self):
         if core.dimension == 1:
             pass
@@ -994,6 +1321,334 @@ class DataLoad:
             update_plot()
         else:
             pass
+
+class Overlay:
+    def __init__(self, master, label):
+        self.frame = Frame(master)
+        self.frame.pack()
+
+        # define instance variables and set defaults
+        self.plot_flag = IntVar()
+        self.overlay_file = StringVar()
+        self.overlay_slice = IntVar()
+        self.overlay_slice.set(1)
+
+        # create default/dummy arrays
+        self.FLY = np.linspace(-0.045, 0.045, 10)
+        self.STP = np.linspace(-0.05, 0.05, 11)
+        self.TIM = np.ones((11, 10))
+        self.FOE = np.ones((11, 10))
+        self.REF = np.ones((11, 10))
+        self.RMD = np.ones((11, 10))
+        self.BSD = np.ones((11, 10))
+        self.SCA = np.ones((11, 10))
+        self.dimension = 11
+
+        # Make headings
+        if label == 'over1':
+            self.head_label = Label(self.frame, text='OVERLAY CONTROL')
+            self.head_label.grid(row=0, column=0, columnspan=2, pady=5, sticky='W')
+            self.head_slice = Label(self.frame, text='Current Slice')
+            self.head_slice.grid(row=0, column=2, columnspan=3)
+
+        # make and place widgets
+        self.cbox_plot_flag = Checkbutton(self.frame,
+                                             variable=self.plot_flag,
+                                             command=self.activate_overlay)
+        self.cbox_plot_flag.grid(row=1, column=0, pady=5)
+        self.label_overlay_file = Label(self.frame, textvariable=self.overlay_file,
+                                        width=40, relief=SUNKEN, anchor='w')
+        self.label_overlay_file.grid(row=1, column=1, columnspan=1, padx=5, pady=5)
+        self.button_downslice = Button(self.frame, text='<', command=self.decrement_slice)
+        self.button_downslice.grid(row=1, column=2, sticky='W')
+        self.display_overlay_slice = Label(self.frame, textvariable=self.overlay_slice, width=4, relief=SUNKEN)
+        self.display_overlay_slice.grid(row=1, column=3, padx=5)
+        self.button_upslice = Button(self.frame, text='>', command=self.increment_slice)
+        self.button_upslice.grid(row=1, column=4, sticky='E')
+        self.button_overlay_file = Button(self.frame, text='Load Data', command=self.load_overlay, width=11)
+        self.button_overlay_file.grid(row=1, column=6, padx=5, pady=5)
+        self.button_overlay_grab = Button(self.frame, text='Grab Data', command=self.grab_data, width=11)
+        self.button_overlay_grab.grid(row=1, column=7, padx=5, pady=5)
+
+    def activate_overlay(self):
+        if not self.overlay_file.get():
+            self.grab_data()
+        update_plot()
+
+    def decrement_slice(self):
+        old_slice = self.overlay_slice.get()
+        new_slice = old_slice - 1
+        if new_slice > 0 and self.plot_flag.get():
+            self.overlay_slice.set(new_slice)
+            update_plot()
+        else:
+            pass
+
+    def increment_slice(self):
+        old_slice = self.overlay_slice.get()
+        new_slice = old_slice + 1
+        if new_slice <= self.dimension and self.plot_flag.get():
+            self.overlay_slice.set(new_slice)
+            update_plot()
+        else:
+            pass
+
+    def load_overlay(self):
+        old_data = self.overlay_file.get()
+        if not old_data == '':
+            old_dir = os.path.dirname(old_data)
+            if os.path.exists(old_dir):
+                data_file = askopenfilename(initialdir=old_dir)
+            else:
+                data_file = askopenfilename()
+        else:
+            old_data = data.current_file.get()
+            if not old_data == '':
+                old_dir = os.path.dirname(old_data)
+                if os.path.exists(old_dir):
+                    data_file = askopenfilename(initialdir=old_dir)
+                else:
+                    data_file = askopenfilename()
+            else:
+                data_file = askopenfilename()
+        try:
+            if os.path.isfile(data_file):
+                cdata = np.load(data_file)
+            else:
+                raise IOError
+        except IOError:
+            path_warn()
+            return
+        dimension = cdata['dim'][()]
+        # h_active = cdata['h_act'][()]
+        # v_active = cdata['v_act'][()]
+        # hax.active_stage.set(h_active)
+        # vax.active_stage.set(v_active)
+        self.FLY = cdata['fly']
+        self.STP = cdata['stp']
+        self.TIM = cdata['tim']
+        self.FOE = cdata['foe']
+        self.REF = cdata['ref']
+        self.RMD = cdata['rmd']
+        self.BSD = cdata['bsd']
+        self.overlay_file.set(data_file)
+        self.dimension = dimension
+        if self.dimension > 1:
+            o_slice = divmod(self.dimension, 2)[0]
+            self.overlay_slice.set(o_slice)
+        else:
+            self.overlay_slice.set(1)
+        cdata.close()
+        self.plot_flag.set(1)
+        update_plot()
+
+    def grab_data(self):
+        primary_data = data.current_file.get()
+        if not primary_data == '':
+            data_file = primary_data
+            try:
+                if os.path.isfile(data_file):
+                    cdata = np.load(data_file)
+                else:
+                    raise IOError
+            except IOError:
+                path_warn()
+                return
+            dimension = cdata['dim'][()]
+            # h_active = cdata['h_act'][()]
+            # v_active = cdata['v_act'][()]
+            # hax.active_stage.set(h_active)
+            # vax.active_stage.set(v_active)
+            self.FLY = cdata['fly']
+            self.STP = cdata['stp']
+            self.TIM = cdata['tim']
+            self.FOE = cdata['foe']
+            self.REF = cdata['ref']
+            self.RMD = cdata['rmd']
+            self.BSD = cdata['bsd']
+            self.overlay_file.set(data_file)
+            self.dimension = dimension
+            primary_slice = data.current_slice.get()
+            self.overlay_slice.set(primary_slice)
+            cdata.close()
+            self.plot_flag.set(1)
+            update_plot()
+        else:
+            showinfo('Empty Dataset', 'There is no data to grab!')
+
+class Staff:
+    def __init__(self, master):
+        self.popup = Toplevel(master)
+        self.popup.title('Alignment Tools')
+
+        self.frame_fit = Frame(self.popup, bd=5, relief=RIDGE, padx=12, pady=10)
+        self.frame_fit.grid(row=0, column=0, columnspan=2)
+        self.frame_center = Frame(self.popup, bd=5, relief=RIDGE, padx=10, pady=10)
+        self.frame_center.grid(row=1, column=0)
+        self.frame_zero = Frame(self.popup, bd=5, relief=RIDGE, padx=9, pady=2)
+        self.frame_zero.grid(row=1, column=1)
+
+        # define instance variables and set defaults
+        self.focus_flag = IntVar()
+        self.pv_a = DoubleVar()
+        self.pv_x0 = DoubleVar()
+        self.pv_mul = DoubleVar()
+        self.pv_mur = DoubleVar()
+        self.pv_wl = DoubleVar()
+        self.pv_wr = DoubleVar()
+        self.pv_asymmetry = DoubleVar()
+        self.pv_fwhm = DoubleVar()
+        self.pv_beamsize = DoubleVar()
+        self.popt = np.zeros(6)
+        self.pcov = np.zeros(6)
+        self.area = 0
+        self.err = 0
+        self.area_calc = 0
+
+        # make frame_fit headings
+        self.head_label = Label(self.frame_fit, text='PSEUDO-VOIGT PARAMETERS')
+        self.head_label.grid(row=0, column=0)
+        self.head_area = Label(self.frame_fit, text='Area')
+        self.head_area.grid(row=0, column=2)
+        self.head_x0 = Label(self.frame_fit, text='Center')
+        self.head_x0.grid(row=0, column=3)
+        self.head_eta = Label(self.frame_fit, text=u'\u03b7')
+        self.head_eta.grid(row=0, column=4)
+        self.head_width = Label(self.frame_fit, text='Width')
+        self.head_width.grid(row=0, column=5)
+        self.head_asymmetry = Label(self.frame_fit, text='Asymmetry')
+        self.head_asymmetry.grid(row=0, column=6)
+        self.head_fwhm = Label(self.frame_fit, text='FWHM')
+        self.head_fwhm.grid(row=0, column=7)
+        self.head_fraction = Label(self.frame_fit, text='Beam fraction')
+        self.head_fraction.grid(row=0, column=8)
+
+        # define and place frame_fit widgets
+        self.cbox_focus_flag = Checkbutton(self.frame_fit, text='Focus fit',
+                                           variable=self.focus_flag, command=update_plot)
+        self.cbox_focus_flag.grid(row=1, rowspan=2, column=0, padx=5, pady=5)
+        self.label_less = Label(self.frame_fit, text='x < Center')
+        self.label_less.grid(row=1, column=1)
+        self.label_more = Label(self.frame_fit, text='x > Center')
+        self.label_more.grid(row=2, column=1)
+        self.label_pv_a = Label(self.frame_fit, textvariable=self.pv_a, width=7, relief=SUNKEN)
+        self.label_pv_a.grid(row=1, rowspan=2, column=2, padx=5, pady=5)
+        self.label_pv_x0 = Label(self.frame_fit, textvariable=self.pv_x0, width=7, relief=SUNKEN)
+        self.label_pv_x0.grid(row=1, rowspan=2, column=3, padx=5, pady=5)
+        self.label_pv_mul = Label(self.frame_fit, textvariable=self.pv_mul, width=7, relief=SUNKEN)
+        self.label_pv_mul.grid(row=1, column=4, padx=5, pady=5)
+        self.label_pv_mur = Label(self.frame_fit, textvariable=self.pv_mur, width=7, relief=SUNKEN)
+        self.label_pv_mur.grid(row=2, column=4, padx=5, pady=5)
+        self.label_pv_wl = Label(self.frame_fit, textvariable=self.pv_wl, width=7, relief=SUNKEN)
+        self.label_pv_wl.grid(row=1, column=5, padx=5, pady=5)
+        self.label_pv_wr = Label(self.frame_fit, textvariable=self.pv_wr, width=7, relief=SUNKEN)
+        self.label_pv_wr.grid(row=2, column=5, padx=5, pady=5)
+        self.label_pv_asymmetry = Label(self.frame_fit, textvariable=self.pv_asymmetry, width=7, relief=SUNKEN)
+        self.label_pv_asymmetry.grid(row=1, rowspan=2, column=6, padx=5, pady=5)
+        self.label_pv_fwhm = Label(self.frame_fit, textvariable=self.pv_fwhm, width=7, relief=SUNKEN)
+        self.label_pv_fwhm.grid(row=1, rowspan=2, column=7, padx=5, pady=5)
+        self.label_pv_beamsize = Entry(self.frame_fit, textvariable=self.pv_beamsize, width=7)
+        self.label_pv_beamsize.grid(row=1, rowspan=2, column=8, padx=5, pady=5)
+        self.label_pv_beamsize.bind('<FocusOut>', self.find_width)
+        self.label_pv_beamsize.bind('<Return>', self.find_width)
+
+        # make frame_center headings
+        self.head_label = Label(self.frame_center, text='FULL CENTERING CONTROL')
+        self.head_label.grid(row=0, column=0)
+        self.head_cenx = Label(self.frame_center, text='Cen X')
+        self.head_cenx.grid(row=0, column=2, padx=5, pady=5)
+        self.head_ceny = Label(self.frame_center, text='Cen Y')
+        self.head_ceny.grid(row=0, column=3, padx=5, pady=5)
+        self.head_basey = Label(self.frame_center, text='Base Y')
+        self.head_basey.grid(row=0, column=4, padx=5, pady=5)
+
+        # make and place frame_center widgets
+        self.label_deltas = Label(self.frame_center, text='Deltas')
+        self.label_deltas.grid(row=1, column=1, padx=5, pady=5)
+        self.label_del_x = Label(self.frame_center, textvariable=center.delta_x, relief=SUNKEN, width=8)
+        self.label_del_x.grid(row=1, column=2, padx=5, pady=5)
+        self.label_del_y = Label(self.frame_center, textvariable=center.delta_y, relief=SUNKEN, width=8)
+        self.label_del_y.grid(row=1, column=3, padx=5, pady=5)
+        self.label_del_base = Label(self.frame_center, textvariable=center.delta_y_base, relief=SUNKEN, width=8)
+        self.label_del_base.grid(row=1, column=4, padx=5, pady=5)
+        self.label_absolute = Label(self.frame_center, text='Target Positions')
+        self.label_absolute.grid(row=2, column=1, padx=5, pady=5)
+        self.label_abs_x = Label(self.frame_center, textvariable=center.absolute_x, relief=SUNKEN, width=8)
+        self.label_abs_x.grid(row=2, column=2, padx=5, pady=5)
+        self.label_abs_y = Label(self.frame_center, textvariable=center.absolute_y, relief=SUNKEN, width=8)
+        self.label_abs_y.grid(row=2, column=3, padx=5, pady=5)
+        self.label_abs_base = Label(self.frame_center, textvariable=center.absolute_y_base, relief=SUNKEN, width=8)
+        self.label_abs_base.grid(row=2, column=4, padx=5, pady=5)
+        self.button_move_all = Button(self.frame_center, text='Move All', command=center.move_all, width=12)
+        self.button_move_all.grid(row=1, rowspan=2, column=5, padx=10, pady=5)
+
+        # frame_zero widgets
+        self.button_zero_x = Button(self.frame_zero, text='Re-zero x', command=lambda: self.zero_stage(mX), width=8)
+        self.button_zero_x.grid(row=0, column=0, padx=10, pady=5)
+        self.button_zero_y = Button(self.frame_zero, text='Re-zero y', command=lambda: self.zero_stage(mY), width=8)
+        self.button_zero_y.grid(row=1, column=0, padx=10, pady=5)
+        self.button_zero_z = Button(self.frame_zero, text='Re-zero z', command=lambda: self.zero_stage(mZ), width=8)
+        self.button_zero_z.grid(row=2, column=0, padx=10, pady=5)
+
+        # hide window on startup
+        self.popup.withdraw()
+
+    def find_width(self, *event):
+        staff.area_calc = 1
+        target = staff.pv_beamsize.get()
+        new_mid = staff.pv_x0.get()
+        new_min = new_mid - 0.008
+        new_max = new_mid + 0.008
+        step = 0.002
+        initial = staff.area / staff.pv_a.get()
+        if initial - target > 0:
+            direction = -1
+        else:
+            direction = 1
+        for i in range(100):
+            current = staff.area / staff.pv_a.get()
+            difference = current - target
+            if abs(difference) > 0.001:
+                if difference > 0 and direction == -1:
+                    direction = -1
+                elif difference < 0 and direction == 1:
+                    direction = 1
+                elif difference < 0 and direction == -1:
+                    step *= 0.4
+                    direction = 1
+                elif difference > 0 and direction == 1:
+                    step *= 0.4
+                    direction = -1
+                new_min -= step*direction
+                new_max += step*direction
+                hax.min_pos.set(new_min)
+                hax.max_pos.set(new_max)
+                beamsize_integral()
+            else:
+                if i:
+                    hax.min_pos.set('%.4f' % new_min)
+                    hax.mid_pos.set('%.4f' % new_mid)
+                    hax.max_pos.set('%.4f' % new_max)
+                    print i
+                    print difference
+                    update_plot()
+                staff.area_calc = 0
+                break
+
+    def calc_mixes(self):
+        wl = self.pv_wl.get()
+        wr = self.pv_wr.get()
+        asym = (wl - wr)/(wl + wr)
+        fwhm = 0.5*wl + 0.5*wr
+        self.pv_asymmetry.set('%.2f' % asym)
+        self.pv_fwhm.set('%.4f' % fwhm)
+
+    def zero_stage(self, stage):
+        confirm = askyesno('Confirm action', 'Are you sure you want to proceed?')
+        if confirm:
+            stage.SET = 1
+            stage.VAL = 0
+            stage.SET = 0
 
 
 class DragHorizontalLines:
@@ -1122,6 +1777,12 @@ class DragVerticalLines:
             elif data.current_slice.get() == 3:
                 center.y_plus_pos.set('%.4f' % mid_fin[0])
             center.calc_deltas()
+        if staff.focus_flag.get() and counter.data_type.get() == 'Derivative':
+            if core.dimension == 1 or data.slice_flag.get():
+                beamsize_integral()
+                print staff.area, staff.pv_a.get()
+                fraction = staff.area / staff.pv_a.get()
+                staff.pv_beamsize.set('%.3f' % fraction)
 
 
 def onclick(event):
@@ -1137,6 +1798,9 @@ def onclick(event):
     fly_axis_length = core.FLY.shape[0]
     image_index = yind*fly_axis_length + xind + 1
     data.index.set(image_index)
+    # start dioptas test
+    if image.dioptas_flag.get():
+        image.send_to_dioptas()
     return hax.mid_pos.set('%.4f' % x_val), vax.mid_pos.set('%.4f' % y_val)
 
 
@@ -1154,6 +1818,9 @@ def overwrite_warn():
     showwarning('Overwrite Warning',
                 'Scan no. and/or Image No. automatically incremented')
 
+def confirm_action():
+    askyesno('Confirm action', 'Are you sure you want to proceed?')
+
 
 def close_quit():
     # add dialog box back in and indent following code after testing period
@@ -1163,60 +1830,101 @@ def close_quit():
     root.quit()
 
 
+def hide_window():
+    staff.popup.withdraw()
+
+
+def piecewise_split_pv(x, a, x0, mul, mur, wl, wr):
+    condlist = [x < x0, x >= x0]
+    funclist = [
+            lambda x: a * (mul * (2/pi) * (wl / (4*(x-x0)**2 + wl**2)) + (1 - mul) * (sqrt(4*np.log(2)) / (sqrt(pi) * wl)) * exp(-(4*np.log(2)/wl**2)*(x-x0)**2)),
+            lambda x: a * (mur * (2/pi) * (wr / (4*(x-x0)**2 + wr**2)) + (1 - mur) * (sqrt(4*np.log(2)) / (sqrt(pi) * wr)) * exp(-(4*np.log(2)/wr**2)*(x-x0)**2))]
+    return np.piecewise(x, condlist, funclist)
+
+
+def beamsize_integral():
+    t_popt = tuple(staff.popt)
+    lower_bound = float(hax.min_pos.get())
+    upper_bound = float(hax.max_pos.get())
+    staff.area, staff.err = integrate.quad(func=piecewise_split_pv, a=lower_bound,
+                                           b=upper_bound, args=t_popt)
+
+
+def path_put(**kwargs):
+    image.det_path.set(detector.get('FilePath_RBV', as_string=True))
+
+
 def update_plot(*args):
-    # fetch and locally name the arrays selected by the user
-    local_dict = {
-        'Beamstop diode': core.BSD,
-        'Removable diode': core.RMD,
-        'Hutch reference': core.REF,
-        'FOE ion chamber': core.FOE,
-        '50 MHz clock': core.TIM}
-    signal = counter.i_signal.get()
-    reference = counter.i_ref.get()
-    sig_array = local_dict[signal]
-    ref_array = local_dict[reference]
-    # normalize if needed
-    if counter.ref_flag.get():
-        raw_array = np.divide(sig_array, ref_array)
-    else:
-        raw_array = sig_array
-    # create the basic core.SCA for plotting
-    core.SCA = raw_array * counter.scale.get()
-    # calculate derivative here if needed
-    if counter.data_type.get() == 'Derivative':
-        TEMP = np.ones(core.SCA.shape)
-        x_length = len(core.FLY)
-        for steps in range(core.dimension):
-            for x in range(x_length):
-                if x == 0 or x == x_length - 1:
-                    pass
-                else:
-                    dy = core.SCA[steps][x+1] - core.SCA[steps][x-1]
-                    dx = core.FLY[x+1] - core.FLY[x-1]
-                    TEMP[steps][x] = dy/dx
-            TEMP[steps][0] = TEMP[steps][1]
-            TEMP[steps][x_length-1] = TEMP[steps][x_length-2]
-        core.SCA = TEMP
+    # create a list for iteration
+    array_list = [core, over1, over2, over3]
+    for each in array_list:
+        if each.plot_flag.get():
+            # fetch and locally name the arrays selected by the user
+            local_dict = {
+                'Beamstop diode': each.BSD,
+                'Removable diode': each.RMD,
+                'Hutch reference': each.REF,
+                'FOE ion chamber': each.FOE,
+                '50 MHz clock': each.TIM}
+            signal = counter.i_signal.get()
+            reference = counter.i_ref.get()
+            sig_array = local_dict[signal]
+            ref_array = local_dict[reference]
+            # normalize if needed
+            if counter.ref_flag.get():
+                raw_array = np.divide(sig_array, ref_array)
+            else:
+                raw_array = sig_array
+            # create the basic core.SCA for plotting
+            each.SCA = raw_array * counter.scale.get()
+            # calculate derivative here if needed
+            if counter.data_type.get() == 'Derivative':
+                TEMP = np.ones(each.SCA.shape)
+                x_length = len(each.FLY)
+                for steps in range(each.dimension):
+                    for x in range(x_length):
+                        if x == 0 or x == x_length - 1:
+                            pass
+                        else:
+                            dy = each.SCA[steps][x+1] - each.SCA[steps][x-1]
+                            dx = each.FLY[x+1] - each.FLY[x-1]
+                            TEMP[steps][x] = dy/dx
+                    TEMP[steps][0] = TEMP[steps][1]
+                    TEMP[steps][x_length-1] = TEMP[steps][x_length-2]
+                each.SCA = TEMP
     # select, if necessary, the indicated slice of core.SCA
     if data.slice_flag.get() and core.dimension > 1:
-        index = data.current_slice.get() -1
+        index = data.current_slice.get() - 1
         core.SCA = core.SCA[index]
+        for each in array_list:
+            if each == core:
+                pass
+            else:
+                if each.plot_flag.get():
+                    index = each.overlay_slice.get() - 1
+                    each.SCA = each.SCA[index]
     # clear fields and plot
-    hax.min_pos.set('')
-    hax.mid_pos.set('')
-    hax.max_pos.set('')
-    hax.width.set('')
-    vax.min_pos.set('')
-    vax.mid_pos.set('')
-    vax.max_pos.set('')
-    vax.width.set('')
+    # ###if staff.area_calc:
+    # ###    x_left = float(hax.min_pos.get())
+    # ###    x_right = float(hax.max_pos.get())
+    # ###    x_mid = staff.pv_x0.get()
+    # ###hax.min_pos.set('')
+    # ###hax.mid_pos.set('')
+    # ###hax.max_pos.set('')
+    # ###hax.width.set('')
+    # ###vax.min_pos.set('')
+    # ###vax.mid_pos.set('')
+    # ###vax.max_pos.set('')
+    # ###vax.width.set('')
     plt.clf()
     # plot it!
     plt.xlabel('Fly axis:  ' + fly_axis.axis.get())
     if core.dimension == 1 or data.slice_flag.get():
         plt.ylabel('Intensity')
-        shp = core.FLY.shape
-        core.SCA.shape = shp
+        for each in array_list:
+            if each.plot_flag.get():
+                shp = each.FLY.shape
+                each.SCA.shape = shp
         # set up Arun bars (draggable horizontal and vertical lines)
         f_min = np.amin(core.SCA)
         f_max = np.amax(core.SCA)
@@ -1230,7 +1938,11 @@ def update_plot(*args):
                 m = (f2 - f1)/(x2 - x1)
                 x_mid = (f_mid - f1)/m + x1
                 mid_list.append(x_mid)
-        if len(mid_list) < 2:
+        if staff.area_calc:
+            x_left = float(hax.min_pos.get())
+            x_right = float(hax.max_pos.get())
+            x_mid = staff.pv_x0.get()
+        elif len(mid_list) < 2:
             x_min = np.amin(core.FLY)
             x_max = np.amax(core.FLY)
             x_span = (x_max - x_min)
@@ -1282,13 +1994,50 @@ def update_plot(*args):
         fly_axis_length = core.FLY.shape[0]
         image_index = yind*fly_axis_length + xind + 1
         data.index.set(image_index)
-        if counter.data_type.get() == 'Derivative':
-            plt.plot(core.FLY[1:-1], core.SCA[1:-1], marker='.', ls='-')
-        else:
-            plt.plot(core.FLY, core.SCA, marker='.', ls='-')
+        if staff.focus_flag.get() and counter.data_type.get() == 'Derivative':
+            abs_values = np.abs(core.SCA)
+            guess_index = np.argmax(abs_values)
+            a = core.SCA[guess_index] * 0.005
+            x0 = core.FLY[guess_index]
+            p0 = [a, x0, 0.5, 0.5, 0.005, 0.005]
+            staff.popt, pcov = curve_fit(piecewise_split_pv, core.FLY, core.SCA, p0=p0)
+            staff.pv_a.set('%.2f' % staff.popt[0])
+            staff.pv_x0.set('%.4f' % staff.popt[1])
+            staff.pv_mul.set('%.2f' % staff.popt[2])
+            staff.pv_mur.set('%.2f' % staff.popt[3])
+            staff.pv_wl.set('%.4f' % staff.popt[4])
+            staff.pv_wr.set('%.4f' % staff.popt[5])
+            staff.calc_mixes()
+            # tpopt = tuple(staff.popt)
+            # lower_bound = float(hax.min_pos.get())
+            # upper_bound = float(hax.max_pos.get())
+            # area, err = integrate.quad(func=piecewise_split_pv, a=lower_bound,
+            #                            b=upper_bound, args=tpopt)
+            beamsize_integral()
+            print staff.area, staff.pv_a.get()
+            fraction = staff.area / staff.pv_a.get()
+            staff.pv_beamsize.set('%.3f' % fraction)
+        for each in array_list:
+            if each.plot_flag.get():
+                if counter.data_type.get() == 'Derivative':
+                    plt.plot(each.FLY[1:-1], each.SCA[1:-1], marker='.', ls='-')
+                    if staff.focus_flag.get():
+                        plt.plot(core.FLY, piecewise_split_pv(core.FLY, *staff.popt), 'ro:')
+                else:
+                    plt.plot(each.FLY, each.SCA, marker='.', ls='-')
     else:
         plt.ylabel('Step axis:  ' + step_axis.axis.get())
-        plt.contourf(core.FLY, core.STP, core.SCA, 64)
+        # test intensity scaling
+        area_min = np.amin(core.SCA)
+        area_max = np.amax(core.SCA)
+        area_range = area_max - area_min
+        cf_min = area_min + area_range*counter.min_scale.get()*0.01
+        cf_max = area_min + area_range*counter.max_scale.get()*0.01
+        levels = counter.levels.get() + 1
+        V = np.linspace(cf_min, cf_max, levels)
+        # N = counter.max_scale.get()
+        plt.contourf(core.FLY, core.STP, core.SCA, V)
+        # plt.contourf(core.FLY, core.STP, core.SCA, 64)
         plt.colorbar()
         halfx = (plt.xlim()[1] + plt.xlim()[0])/2
         halfy = (plt.ylim()[1] + plt.ylim()[0])/2
@@ -1300,6 +2049,14 @@ def update_plot(*args):
         fly_axis_length = core.FLY.shape[0]
         image_index = yind*fly_axis_length + xind + 1
         data.index.set(image_index)
+        # grid test
+        if image.grid_flag.get():
+            eh = plt.gca()
+            eh.set_yticks(core.STP, minor=True)
+            eh.set_xticks(core.FLY, minor=True)
+            eh.yaxis.grid(True, which='minor')
+            eh.xaxis.grid(True, which='minor')
+        # test finished, it works, tweak display positions, develop toggle
     plt.gcf().canvas.draw()
     print 'update done'
 
@@ -1328,6 +2085,7 @@ mY = Motor('XPSGP:m4')
 mZ = Motor('XPSGP:m3')
 mW = Motor('XPSGP:m2')
 mWGP = Motor('XPSGP:m1')
+mYbase = Motor('16IDB:m4')
 
 mXpco = Device('XPSGP:m5', pco_args)
 mYpco = Device('XPSGP:m4', pco_args)
@@ -1339,7 +2097,7 @@ mcs = Struck('16IDB:SIS1:')
 
 bnc = PV('16IDB:cmdReply1_do_IO.AOUT')
 # detector commented out for ioc protection
-# #detector = Device('HP1M-PIL1:cam1:', detector_args)
+detector = Device('HP1M-PIL1:cam1:', detector_args)
 
 # create dictionaries of valid motors, pcos, and counters
 stage_dict = {
@@ -1359,33 +2117,41 @@ counter_list = [
     'FOE ion chamber',
     '50 MHz clock']
 
+detector.add_callback('FilePath_RBV', callback=path_put)
 # Primary frames for displaying objects
 framePlot = Frame(root)
-framePlot.grid(row=0, rowspan=4, column=0)
+framePlot.grid(row=0, rowspan=4, column=0, sticky='n')
 frameScanBox = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
 frameScanBox.grid(row=0, column=1, sticky='ew')
-frameIntensity = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
-frameIntensity.grid(row=1, column=1, sticky='ew')
-frameImages = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
-frameImages.grid(row=2, column=1, sticky='ew')
 frameCentering = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
-frameCentering.grid(row=3, column=1, sticky='ew')
+frameCentering.grid(row=1, column=1, sticky='ew')
+frameIntensity = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
+frameIntensity.grid(row=2, column=1, sticky='ew')
+frameImages = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
+frameImages.grid(row=5, column=1, sticky='nsew')
 framePosition = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
-framePosition.grid(row=4, column=1, sticky='ew')
+framePosition.grid(row=3, column=1, sticky='nsew')
+frameActions = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
+frameActions.grid(row=4, column=1, sticky='ew')
 frameFiles = Frame(root, width=652, height=123, bd=5, relief=RIDGE, padx=10, pady=5)
 frameFiles.grid(row=4, column=0, sticky='nsew')
+frameOverlays = Frame(root, width=652, bd=5, relief=RIDGE, padx=10, pady=5)
+frameOverlays.grid(row=5, column=0, sticky='ew')
 
 # make a drawing area
-fig = plt.figure(figsize=(8, 6))
+fig = plt.figure(figsize=(9, 6.7))
 canvas = FigureCanvasTkAgg(fig, framePlot)
 canvas.get_tk_widget().grid(row=0, column=0)
 toolbar = NavigationToolbar2TkAgg(canvas, framePlot)
 toolbar.grid(row=1, column=0, sticky='ew')
-quit_button = Button(framePlot, text='Quit', command=close_quit, width=15)
-quit_button.grid(row=1, column=0, sticky='s')
+
+
+# quit_button = Button(framePlot, text='Quit', command=close_quit, width=15)
+# quit_button.grid(row=1, column=0, sticky='s')
 
 # initialize core data
 core = CoreData()
+
 
 # collections of objects to put in frames above
 fly_axis = ScanBox(frameScanBox, label='Fly axis')
@@ -1396,9 +2162,20 @@ image = Images(frameImages)
 center = Centering(frameCentering)
 hax = Position(framePosition, label='Horizontal axis')
 vax = Position(framePosition, label='Vertical axis')
+action = Actions(frameActions)
 data = DataLoad(frameFiles)
+over1 = Overlay(frameOverlays, label='over1')
+over2 = Overlay(frameOverlays, label='over2')
+over3 = Overlay(frameOverlays, label='over3')
+staff = Staff(root)
 
 # temporary!!!!
+cbox_enable_grid = Checkbutton(framePlot, text='Overlay 2D Grid', variable=image.grid_flag, command=update_plot)
+cbox_enable_grid.grid(row=1, column=0, sticky='s')
 cid = fig.canvas.mpl_connect('button_press_event', onclick)
 root.protocol('WM_DELETE_WINDOW', close_quit)
+staff.popup.protocol('WM_DELETE_WINDOW', hide_window)
+path_put()
+root.update_idletasks()
+action.more_less()
 root.mainloop()
