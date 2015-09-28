@@ -2,8 +2,6 @@ __author__ = 'j.smith'
 
 '''
 A GUI for creating, reading, and graphing flyscan (1d or 2d) files
-
-Devel version test for github!! 2 August 2015
 '''
 
 # import necessary modules
@@ -24,6 +22,77 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 
 
 # define classes
+class ExpConfigure:
+    """
+    ExpConfigure used to specify endstation (more specifically, stages)
+
+    This pops up when the program is first started, and cannot be called
+    again.  User must close and restart software to choose an alternate
+    configuration  Ultimately, this class yields one variable which
+    is used to set up all of the epics connections.
+    """
+
+    def __init__(self, master):
+        # set up frames
+        self.config_window = Toplevel(master)
+        self.config_window.title('Select endstation')
+        self.config_window.geometry('275x500')
+        self.frame_stages = Frame(self.config_window)
+        self.frame_stages.grid(row=1, column=0, pady=10)
+
+        # define variables for stack choice and custom config
+        self.stack_choice = StringVar()
+        self.stack_choice.set(NONE)
+        self.use_file = BooleanVar()
+        self.use_file.set(0)
+
+        # set up list to make buttons
+        stack_list = [
+            ('BMB Laue Table', 'BMBLT'),
+            ('BMB PEC Table', 'BMBPEC'),
+            ('BMD High Precision', 'BMDHP'),
+            ('BMD High Load', 'BMDHL'),
+            ('IDB GP High Precision', 'GPHP'),
+            ('IDB GP High Load', 'GPHL'),
+            ('IDB Laser Heating Table', 'IDBLH'),
+            ('IDD', 'IDD')]
+
+        # make radio buttons for stages using lists
+        for stacks, designation in stack_list:
+            self.motor_buttons = Radiobutton(self.frame_stages, text=stacks,
+                                             variable=self.stack_choice,
+                                             value=designation)
+            self.motor_buttons.grid(sticky='w', pady=5)
+
+        # make option for custom config file
+        self.custom_button = Radiobutton(self.config_window,
+                                         text='Load custom configuration from file',
+                                         variable=self.use_file, value=1)
+        self.custom_button.grid(row=3, column=0, columnspan=2, pady=5)
+
+        # make column headings
+        self.stack_head = Label(self.config_window, text='Select one set of stages')
+        self.stack_head.grid(row=0, column=0, pady=5)
+
+        # make confirmation and custom config buttons
+        self.confirm_choice = Button(self.config_window, text='Confirm choice',
+                                     command=self.confirm_choices)
+        self.confirm_choice.grid(row=4, column=0, columnspan=2, pady=10)
+        self.or_label = Label(self.config_window, text='-----OR-----')
+        self.or_label.grid(row=2, column=0, columnspan=2, pady=5)
+
+    def confirm_choices(self):
+        """
+        Destroy window, pass control back to root to define devices
+        """
+        if not self.stack_choice.get() == 'GPHP':
+            showerror('Under Development',
+                      'Those stages are not yet available, program will exit')
+            close_quit()
+        else:
+            self.config_window.destroy()
+
+
 class CoreData:
     """
     Core data that will be repeatedly used and modified for plotting
@@ -68,10 +137,10 @@ class ScanBox:
         self.rel_max = DoubleVar()
         self.npts = IntVar()
         if label == 'Fly axis':
-            self.axis.set('XPS Cen Y')
+            self.axis.set(fly_list[0])
             self.flag.set(1)
         elif label == 'Step axis':
-            self.axis.set('XPS Sam Z')
+            self.axis.set(step_list[1])
             self.flag.set(0)
         self.rel_min.set('%.3f' % -.05)
         self.step_size.set('%.4f' % .01)
@@ -204,9 +273,23 @@ class ScanBox:
         return self.step_size.set('%.4f' % size)
 
     def axis_validate(self, event, *args):
-        if self.axis.get() != 'Custom':
+        if not self.axis.get() == 'More' and not self.axis.get() == 'Custom':
             pass
-        else:
+        elif self.axis.get() == 'More':
+            popup = Toplevel()
+            xtop = root.winfo_x() + root.winfo_width() / 2 + 200
+            ytop = root.winfo_y() + root.winfo_height() / 2 - 210
+            popup.geometry('180x360+%d+%d' % (xtop, ytop))
+            popup.title('Additional stages')
+            popup.grab_set()
+            label_1 = Label(popup, text='Please select a stage')
+            label_1.pack(side=TOP, pady=10)
+            for each in more_list:
+                buttons = Radiobutton(popup, text=each, variable=self.axis,
+                                      value=each, indicatoron=0, width=20,
+                                      command=lambda: popup.destroy())
+                buttons.pack(pady=2, ipady=1)
+        elif self.axis.get() == 'Custom':
             custom_stage = StringVar()
             popup = Toplevel()
             xtop = root.winfo_x() + root.winfo_width() / 2 - 190
@@ -249,7 +332,7 @@ class ScanBox:
             except:
                 showwarning('Invalid entry',
                             'Cannot connect to %s, please try again' % prefix)
-                self.axis.set('XPS Sam Z')
+                self.axis.set(step_list[1])
                 return
             name = step_axis.mCustom.description
             self.axis.set(name)
@@ -338,14 +421,16 @@ class ScanActions:
         t_zero = time.clock()
         action.abort.set(0)
         # ###make this a static method###
-        # clear plot, position info and set dimension
+        # ensure destination directory is specified
         while step_axis.scan_directory.get() == 'Select directory before scan':
             step_axis.choose_directory()
+        # prevent flying and stepping the same stage
         if step_axis.axis.get() == fly_axis.axis.get() and step_axis.flag.get():
             showwarning('Stage overworked',
                         'Stage cannot step and fly at the same time\n'
                         'Please select different stage(s) and try again')
             return
+        # double-check that npts and step size work together
         fly_axis.npts_validate()
         step_axis.npts_validate()
         if not fly_axis.flag.get():
@@ -355,14 +440,14 @@ class ScanActions:
         # enter step stage info for centering scans
         if center.c_flag.get():
             step_axis.flag.set(1)
-            step_axis.axis.set('XPS Omega')
+            step_axis.axis.set(mW.DESC)
             omega = float(center.delta_w.get())
             step_axis.rel_min.set('-' + '%.3f' % omega)
             step_axis.rel_max.set('%.3f' % omega)
             step_axis.npts.set(3)
             step_axis.calc_size()
         plt.clf()
-        # generate filename
+        # generate filename and make sure it does not already exist
         prefix = step_axis.scan_directory.get() + 'fScan_'
         index = step_axis.scan_no.get()
         path = prefix + index
@@ -378,8 +463,6 @@ class ScanActions:
             step_axis.scan_no.set(index)
             data.current_file.set(full_filename)
             overwrite_warn()
-        h_active = fly_axis.axis.get()
-        hax.active_stage.set(h_active)
         # clear fields
         data.current_slice.set(1)
         data.slice_flag.set(0)
@@ -401,6 +484,7 @@ class ScanActions:
         vax.mid_pos.set('')
         vax.max_pos.set('')
         vax.width.set('')
+        # write in active elements and determine dimension
         if step_axis.flag.get():
             step_npts = step_axis.npts.get()
             v_active = step_axis.axis.get()
@@ -409,18 +493,31 @@ class ScanActions:
             v_active = 'Counts'
         core.dimension = step_npts
         vax.active_stage.set(v_active)
+        h_active = fly_axis.axis.get()
+        hax.active_stage.set(h_active)
         plt.gcf().canvas.draw()
         framePlot.update_idletasks()
+        # ###Here is where two phase stepper development comes in for first time### #
         # define temporary EPICS motor devices, fly velocity, and scan endpoints
-        mFly, mFlypco, channel = stage_dict[fly_axis.axis.get()]
+        controller, mFly, mFlypco, channel, sg_input = stage_dict[fly_axis.axis.get()]
         if step_axis.axis.get() in stage_dict:
             mStep = stage_dict[step_axis.axis.get()][0]
         else:
             mStep = step_axis.mCustom
-        bnc.put(channel)
         mFly_ipos = mFly.RBV
         mStep_ipos = mStep.RBV
         perm_velo = mFly.VELO
+        perm_bdst = mFly.BDST
+        if controller == 'MAXV':
+            micro_steps = round(fly_axis.step_size.get()/mFly.MRES)
+            new_step_size = micro_steps*mFly.MRES
+            new_rel_min = fly_axis.rel_min.get()*new_step_size/fly_axis.step_size.get()
+            new_rel_max = fly_axis.rel_min.get()*new_step_size/fly_axis.step_size.get()
+### start here ###
+### start here ###
+# TODO Start here
+
+        bnc.put(channel)
         temp_velo = fly_axis.step_size.get() / self.exp_time.get()
         abs_step_plot_min = mStep_ipos + step_axis.rel_min.get()
         abs_step_plot_max = mStep_ipos + step_axis.rel_max.get()
@@ -553,6 +650,7 @@ class ScanActions:
             detector.NumImages = 1
             image.flag.set(0)
         mFlypco.put('PositionCompareMode', 0, wait=True)
+        # ### here is roughly the end of two phase development ###
         mFly.move(mFly_ipos, wait=True)
         mStep.move(mStep_ipos, wait=True)
         np.savez(path,
@@ -1851,7 +1949,8 @@ def beamsize_integral():
 
 
 def path_put(**kwargs):
-    image.det_path.set(detector.get('FilePath_RBV', as_string=True))
+    pass
+    # ###image.det_path.set(detector.get('FilePath_RBV', as_string=True))
 
 
 def update_plot(*args):
@@ -2066,8 +2165,19 @@ Program start
 '''
 root = Tk()
 root.title('Diptera')
+# hide root, draw config window, wait for user input
+root.withdraw()
+config = ExpConfigure(root)
+# line below can be commented in/out and edited for autoconfig
+config.stack_choice.set('GPHP')
+if not config.stack_choice.get() == NONE:
+    config.config_window.destroy()
+else:
+    root.wait_window(config.config_window)
 
-# TODO put 'create' stuff in a config dialog for various endstations
+'''
+With stack choice made, define relevant epics devices, Pvs, etc.
+'''
 # station-independent arg lists for epics Devices
 pco_args = ['PositionCompareMode', 'PositionCompareMinPosition',
             'PositionCompareMaxPosition', 'PositionCompareStepSize',
@@ -2079,45 +2189,81 @@ detector_args = ['ShutterMode', 'ShutterControl', 'AcquireTime',
                  'FileName', 'FileNumber', 'AutoIncrement',
                  'FullFileName_RBV']
 
-# create epics Motors, pco Devices, Struck, bnc PV, and detector Device
-mX = Motor('XPSGP:m5')
-mY = Motor('XPSGP:m4')
-mZ = Motor('XPSGP:m3')
-mW = Motor('XPSGP:m2')
-mWGP = Motor('XPSGP:m1')
-mYbase = Motor('16IDB:m4')
+# include option to load custom file
+if config.use_file.get():
+    user_config = askopenfile(mode='r', title='Please select configuration file')
+    exec user_config.read()
+    user_config.close()
+# hard-encoded configuration options
+elif config.stack_choice.get() == 'GPHP':
+    # create epics Motors, pco Devices, Struck, bnc
+    mX = Motor('XPSGP:m5')
+    mY = Motor('XPSGP:m4')
+    mZ = Motor('XPSGP:m3')
+    mW = Motor('XPSGP:m2')
+    mYbase = Motor('16IDB:m4')
 
-mXpco = Device('XPSGP:m5', pco_args)
-mYpco = Device('XPSGP:m4', pco_args)
-mZpco = Device('XPSGP:m3', pco_args)
-mWpco = Device('XPSGP:m2', pco_args)
-mWGPpco = Device('XPSGP:m1', pco_args)
+    mXpco = Device('XPSGP:m5', pco_args)
+    mYpco = Device('XPSGP:m4', pco_args)
+    mZpco = Device('XPSGP:m3', pco_args)
+    mWpco = Device('XPSGP:m2', pco_args)
 
-mcs = Struck('16IDB:SIS1:')
+    mHSlit = Motor('16IDB:m21')
+    mVSlit = Motor('16IDB:m22')
+    mLgPinY = Motor('16IDB:m19')
+    mLgPinZ = Motor('16IDB:m24')
+    mSmPinY = Motor('16IDB:m17')
+    mSmPinZ = Motor('16IDB:m18')
+    mBSY = Motor('16IDB:m34')
+    mBSZ = Motor('16IDB:m35')
 
-bnc = PV('16IDB:cmdReply1_do_IO.AOUT')
-# detector commented out for ioc protection
-detector = Device('HP1M-PIL1:cam1:', detector_args)
+    mcs = Struck('16IDB:SIS1:')
 
-# create dictionaries of valid motors, pcos, and counters
-stage_dict = {
-    'XPS Cen X': [mX, mXpco, 's05'],
-    'XPS Cen Y': [mY, mYpco, 's04'],
-    'XPS Sam Z': [mZ, mZpco, 's03'],
-    'XPS Omega': [mW, mWpco, 's02'],
-    'GP Omega': [mWGP, mWGPpco, 's01']}
+    bnc = PV('16IDB:cmdReply1_do_IO.AOUT')
 
-fly_list = ['XPS Cen X', 'XPS Cen Y', 'XPS Sam Z', 'XPS Omega', 'GP Omega']
-step_list = ['XPS Cen X', 'XPS Cen Y', 'XPS Sam Z', 'XPS Omega', 'GP Omega', 'Custom']
+    # detector commented out for ioc protection
+    # ###detector = Device('HP1M-PIL1:cam1:', detector_args)
 
-counter_list = [
-    'Beamstop diode',
-    'Removable diode',
-    'Hutch reference',
-    'FOE ion chamber',
-    '50 MHz clock']
+    # create dictionary for valid flyscan motors
+    # 'NAME': [controller, designation, pco, bnc, softGlue]
+    stage_dict = {
+        'XPS Cen X': ['XPS', mX, mXpco, 's05', '15'],
+        'XPS Cen Y': ['XPS', mY, mYpco, 's04', '15'],
+        'XPS Sam Z': ['XPS', mZ, mZpco, 's03', '15'],
+        'XPS Omega': ['XPS', mW, mWpco, 's02', '15'],
+        'GP Hslit Position': ['MAXV', mHSlit, 'nopco', 'sXX', '1'],
+        'GP Vslit Position': ['MAXV', mVSlit, 'nopco', 'sXX', '2'],
+        'GP LKB Pinhole Y': ['MAXV', mLgPinY, 'nopco', 'sXX', '3'],
+        'GP LKB Pinhole Z': ['MAXV', mLgPinZ, 'nopco', 'sXX', '4'],
+        'GP SKB Pinhole Y': ['MAXV', mSmPinY, 'nopco', 'sXX', '5'],
+        'GP SKB Pinhole Z': ['MAXV', mSmPinZ, 'nopco', 'sXX', '6'],
+        'GP Beamstop Y': ['MAXV', mBSY, 'nopco', 'sXX', '11'],
+        'GP Beamstop Z': ['MAXV', mBSZ, 'nopco', 'sXX', '12']}
 
-detector.add_callback('FilePath_RBV', callback=path_put)
+    # create lists for drop-down menus
+    fly_list = ['XPS Cen Y', 'XPS Sam Z', 'More']
+    step_list = ['XPS Cen Y', 'XPS Sam Z', 'More', 'Custom']
+
+    more_list = [
+        'XPS Cen X',
+        'XPS Omega',
+        'GP Hslit Position',
+        'GP Vslit Position',
+        'GP LKB Pinhole Y',
+        'GP LKB Pinhole Z',
+        'GP SKB Pinhole Y',
+        'GP SKB Pinhole Z',
+        'GP Beamstop Y',
+        'GP Beamstop Z']
+
+    counter_list = [
+        'Beamstop diode',
+        'Removable diode',
+        'Hutch reference',
+        'FOE ion chamber',
+        '50 MHz clock']
+
+# ###detector.add_callback('FilePath_RBV', callback=path_put)
 # Primary frames for displaying objects
 framePlot = Frame(root)
 framePlot.grid(row=0, rowspan=4, column=0, sticky='n')
@@ -2145,10 +2291,6 @@ canvas.get_tk_widget().grid(row=0, column=0)
 toolbar = NavigationToolbar2TkAgg(canvas, framePlot)
 toolbar.grid(row=1, column=0, sticky='ew')
 
-
-# quit_button = Button(framePlot, text='Quit', command=close_quit, width=15)
-# quit_button.grid(row=1, column=0, sticky='s')
-
 # initialize core data
 core = CoreData()
 
@@ -2175,7 +2317,8 @@ cbox_enable_grid.grid(row=1, column=0, sticky='s')
 cid = fig.canvas.mpl_connect('button_press_event', onclick)
 root.protocol('WM_DELETE_WINDOW', close_quit)
 staff.popup.protocol('WM_DELETE_WINDOW', hide_window)
-path_put()
+# ###path_put()
 root.update_idletasks()
 action.more_less()
+root.deiconify()
 root.mainloop()
