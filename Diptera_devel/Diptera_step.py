@@ -85,7 +85,8 @@ class ExpConfigure:
         """
         Destroy window, pass control back to root to define devices
         """
-        if not self.stack_choice.get() == 'GPHP':
+        stack = self.stack_choice.get()
+        if stack != 'GPHL':
             showerror('Under Development',
                       'Those stages are not yet available, program will exit')
             close_quit()
@@ -501,7 +502,7 @@ class ScanActions:
         # define temporary EPICS motor devices, fly velocity, and scan endpoints
         controller, mFly, mFlypco, channel, sg_input = stage_dict[fly_axis.axis.get()]
         if step_axis.axis.get() in stage_dict:
-            mStep = stage_dict[step_axis.axis.get()][0]
+            mStep = stage_dict[step_axis.axis.get()][1]
         else:
             mStep = step_axis.mCustom
         mFly_ipos = mFly.RBV
@@ -509,20 +510,57 @@ class ScanActions:
         perm_velo = mFly.VELO
         perm_bdst = mFly.BDST
         if controller == 'MAXV':
-            micro_steps = round(fly_axis.step_size.get()/mFly.MRES)
-            new_step_size = micro_steps*mFly.MRES
+            # must calculate user positions, etc. based on exact number of motor steps
+            resolution = abs(mFly.MRES)
+            micro_steps = round(fly_axis.step_size.get()/resolution)
+            new_step_size = micro_steps*resolution
+            temp_velo = new_step_size/self.exp_time.get()
             new_rel_min = fly_axis.rel_min.get()*new_step_size/fly_axis.step_size.get()
-            new_rel_max = fly_axis.rel_min.get()*new_step_size/fly_axis.step_size.get()
-### start here ###
-### start here ###
-# TODO Start here
-
-        bnc.put(channel)
-        temp_velo = fly_axis.step_size.get() / self.exp_time.get()
-        abs_step_plot_min = mStep_ipos + step_axis.rel_min.get()
-        abs_step_plot_max = mStep_ipos + step_axis.rel_max.get()
-        abs_fly_plot_min = mFly_ipos + fly_axis.rel_min.get() + 0.5*fly_axis.step_size.get()
-        abs_fly_plot_max = mFly_ipos + fly_axis.rel_max.get() - 0.5*fly_axis.step_size.get()
+            new_rel_max = fly_axis.rel_max.get()*new_step_size/fly_axis.step_size.get()
+            abs_step_plot_min = mStep_ipos + step_axis.rel_min.get()
+            abs_step_plot_max = mStep_ipos + step_axis.rel_max.get()
+            abs_fly_plot_min = mFly_ipos + new_rel_min + 0.5*new_step_size
+            abs_fly_plot_max = mFly_ipos + new_rel_max - 0.5*new_step_size
+            abs_fly_min = mFly_ipos + new_rel_min
+            abs_fly_max = mFly_ipos + new_rel_max
+            accl_steps = round((mFly.VBAS + temp_velo)/2*mFly.ACCL/resolution*1.25)
+            accl_distance = accl_steps*resolution
+            fly_zero = abs_fly_min - accl_distance
+            fly_final = abs_fly_max + accl_distance
+            # input all MAXV-specific softglue info
+            softglue.put('DnCntr-1_PRESET', accl_steps)
+            softglue.put('DivByN-1_N', micro_steps)
+            softglue.put(sg_input, 'motor')
+        else:
+            # controller must be XPS (for now)
+            temp_velo = fly_axis.step_size.get() / self.exp_time.get()
+            abs_step_plot_min = mStep_ipos + step_axis.rel_min.get()
+            abs_step_plot_max = mStep_ipos + step_axis.rel_max.get()
+            abs_fly_plot_min = mFly_ipos + fly_axis.rel_min.get() + 0.5*fly_axis.step_size.get()
+            abs_fly_plot_max = mFly_ipos + fly_axis.rel_max.get() - 0.5*fly_axis.step_size.get()
+            abs_fly_min = mFly_ipos + fly_axis.rel_min.get()
+            abs_fly_max = mFly_ipos + fly_axis.rel_max.get()
+            fly_zero = abs_fly_min - temp_velo * mW.ACCL * 1.5
+            fly_final = abs_fly_max + temp_velo * mW.ACCL * 1.5
+            # input all XPS-specific softglue info
+            softglue.put('DnCntr-1_PRESET', 0)
+            softglue.put('DivByN-1_N', 1)
+            softglue.put(sg_input, 'motor')
+            # select PCO output to softglue
+            bnc.put(channel)
+            # set up pco
+            mFlypco.put('PositionCompareMode', 1, wait=True)
+            mFlypco.put('PositionComparePulseWidth', 1, wait=True)
+            # smallest step below, real step size after endpoints
+            mFlypco.put('PositionCompareStepSize', 0.001, wait=True)
+            if mFlypco.PositionCompareMaxPosition <= abs_fly_min:
+                mFlypco.PositionCompareMaxPosition = abs_fly_max
+                mFlypco.PositionCompareMinPosition = abs_fly_min
+            else:
+                mFlypco.PositionCompareMinPosition = abs_fly_min
+                mFlypco.PositionCompareMaxPosition = abs_fly_max
+            mFlypco.PositionCompareStepSize = fly_axis.step_size.get()
+        # initialize core arrays of the proper dimension
         core.FLY = np.linspace(abs_fly_plot_min, abs_fly_plot_max, fly_axis.npts.get() - 1)
         core.STP = np.linspace(abs_step_plot_min, abs_step_plot_max, step_axis.npts.get())
         core.TIM = np.ones((step_npts, fly_axis.npts.get() - 1))
@@ -530,10 +568,6 @@ class ScanActions:
         core.REF = np.ones((step_npts, fly_axis.npts.get() - 1))
         core.BSD = np.ones((step_npts, fly_axis.npts.get() - 1))
         core.RMD = np.ones((step_npts, fly_axis.npts.get() - 1))
-        abs_fly_min = mFly_ipos + fly_axis.rel_min.get()
-        abs_fly_max = mFly_ipos + fly_axis.rel_max.get()
-        fly_zero = abs_fly_min - temp_velo * mW.ACCL * 1.5
-        fly_final = abs_fly_max + temp_velo * mW.ACCL * 1.5
         # limit check
         step_zero = mStep_ipos + step_axis.rel_min.get()
         step_final = mStep_ipos + step_axis.rel_max.get()
@@ -553,32 +587,25 @@ class ScanActions:
         else:
             showwarning('Limit Check Failed', 'One or more stage target(s) exceed limits')
             return
-        # set up pco
-        mFlypco.put('PositionCompareMode', 1, wait=True)
-        mFlypco.put('PositionComparePulseWidth', 1, wait=True)
-        # smallest step below, real step size after endpoints
-        mFlypco.put('PositionCompareStepSize', 0.001, wait=True)
-        if mFlypco.PositionCompareMaxPosition <= abs_fly_min:
-            mFlypco.PositionCompareMaxPosition = abs_fly_max
-            mFlypco.PositionCompareMinPosition = abs_fly_min
-        else:
-            mFlypco.PositionCompareMinPosition = abs_fly_min
-            mFlypco.PositionCompareMaxPosition = abs_fly_max
-        mFlypco.PositionCompareStepSize = fly_axis.step_size.get()
+        # enter for loop for npts flyscans
         for steps in range(step_npts):
+            # for dimension > 1, give chance to abort before each pass
             if not action.abort.get():
-                print action.abort.get()
+                pass
             else:
-                print 'aborted'
+                print 'scan aborted'
                 break
+            # make first move(s)
             if step_npts != 1:
                 step_rel = step_axis.rel_min.get() + steps * step_axis.step_size.get()
                 step_abs = mStep_ipos + step_rel
                 mStep.move(step_abs, wait=True)
             mFly.move(fly_zero, wait=True)
             time.sleep(.25)
+            # set temporary (scan) velocity and zero backlash
             mFly.VELO = temp_velo
-            # initialize struck for dc_1M collection
+            mFly.BDST = 0
+            # initialize struck for collection
             mcs.stop()
             mcs.ExternalMode()
             mcs.put('InputMode', 3, wait=True)
@@ -589,40 +616,43 @@ class ScanActions:
             mcs.put('LNEOutputDelay', 0, wait=True)
             mcs.put('LNEOutputWidth', 1e-6, wait=True)
             mcs.NuseAll = fly_axis.npts.get() - 1
+            # reset softglue to begin fresh counting
+            softglue.put('BUFFER-1_IN_Signal', '1!', wait=True)
             # initialize detector if necessary
-            if image.flag.get():
-                prefix = image.user_path.get() + image.sample_name.get() + '_'
-                image_no = image.image_no.get()
-                suffix = '.tif'
-                first_filename = prefix + image_no + suffix
-                print first_filename
-                if not os.path.isfile(first_filename):
-                    print "is not a file"
-                    pass
-                else:
-                    while os.path.isfile(first_filename):
-                        incremented_index = str(int(image_no) + 1)
-                        image_no = incremented_index.zfill(3)
-                        first_filename = prefix + image_no + suffix
-                    image.image_no.set(image_no)
-                    overwrite_warn()
-                detector.AcquirePeriod = scan.exp_time.get()
-                detector.AcquireTime = scan.exp_time.get() - 0.003
-                detector.FileName = image.sample_name.get()
-                detector.TriggerMode = 2
-                detector.FileNumber = image.image_no.get()
-                detector.NumImages = fly_axis.npts.get() - 1
-                detector.Acquire = 1
+            # ### temporarily remove imaging capability
+            # ###if image.flag.get():
+            # ###    prefix = image.user_path.get() + image.sample_name.get() + '_'
+            # ###    image_no = image.image_no.get()
+            # ###    suffix = '.tif'
+            # ###    first_filename = prefix + image_no + suffix
+            # ###    print first_filename
+            # ###    if not os.path.isfile(first_filename):
+            # ###        print "is not a file"
+            # ###        pass
+            # ###    else:
+            # ###        while os.path.isfile(first_filename):
+            # ###            incremented_index = str(int(image_no) + 1)
+            # ###            image_no = incremented_index.zfill(3)
+            # ###            first_filename = prefix + image_no + suffix
+            # ###        image.image_no.set(image_no)
+            # ###        overwrite_warn()
+            # ###    detector.AcquirePeriod = scan.exp_time.get()
+            # ###    detector.AcquireTime = scan.exp_time.get() - 0.003
+            # ###    detector.FileName = image.sample_name.get()
+            # ###    detector.TriggerMode = 2
+            # ###    detector.FileNumber = image.image_no.get()
+            # ###    detector.NumImages = fly_axis.npts.get() - 1
+            # ###    detector.Acquire = 1
             # Final actions plus data collection move
             mcs.start()
             mFly.move(fly_final, wait=True)
-            if image.flag.get():
-                while detector.Acquire:
-                    time.sleep(0.1)
-                image_number = detector.FileNumber + detector.NumImages - 1
-                str_image_number = str(image_number)
-                image.image_no.set(str_image_number.zfill(3))
-                detector.FileNumber = image_number
+            # ###if image.flag.get():
+            # ###    while detector.Acquire:
+            # ###        time.sleep(0.1)
+            # ###    image_number = detector.FileNumber + detector.NumImages - 1
+            # ###    str_image_number = str(image_number)
+            # ###    image.image_no.set(str_image_number.zfill(3))
+            # ###    detector.FileNumber = image_number
             # handle data
             TIM_ara = mcs.readmca(1)
             FOE_ara = mcs.readmca(5)
@@ -640,16 +670,19 @@ class ScanActions:
             core.BSD[steps] = BSD_ara_bit
             core.RMD[steps] = RMD_ara_bit
             mFly.VELO = perm_velo
+            mFly.BDST = perm_bdst
             time.sleep(.25)
             update_plot()
             # try this for not responding, possibly remove
             framePlot.update()
         # recover
-        if image.flag.get():
-            detector.TriggerMode = 0
-            detector.NumImages = 1
-            image.flag.set(0)
-        mFlypco.put('PositionCompareMode', 0, wait=True)
+        # ###if image.flag.get():
+        # ###    detector.TriggerMode = 0
+        # ###    detector.NumImages = 1
+        # ###    image.flag.set(0)
+        if controller == 'XPS':
+            mFlypco.put('PositionCompareMode', 0, wait=True)
+        softglue.put(sg_input, '')
         # ### here is roughly the end of two phase development ###
         mFly.move(mFly_ipos, wait=True)
         mStep.move(mStep_ipos, wait=True)
@@ -2169,7 +2202,7 @@ root.title('Diptera')
 root.withdraw()
 config = ExpConfigure(root)
 # line below can be commented in/out and edited for autoconfig
-config.stack_choice.set('GPHP')
+# config.stack_choice.set('GPHP')
 if not config.stack_choice.get() == NONE:
     config.config_window.destroy()
 else:
@@ -2182,6 +2215,21 @@ With stack choice made, define relevant epics devices, Pvs, etc.
 pco_args = ['PositionCompareMode', 'PositionCompareMinPosition',
             'PositionCompareMaxPosition', 'PositionCompareStepSize',
             'PositionComparePulseWidth', 'PositionCompareSettlingTime']
+
+softglue_args = ['FI1_Signal', 'FI2_Signal', 'FI3_Signal', 'FI4_Signal',
+                 'FI5_Signal', 'FI6_Signal', 'FI7_Signal', 'FI8_Signal',
+                 'FI9_Signal', 'FI10_Signal', 'FI11_Signal', 'FI12_Signal',
+                 'FI13_Signal', 'FI14_Signal', 'FI15_Signal', 'FI16_Signal',
+                 'FO17_Signal',
+                 'AND-1_IN1_Signal', 'AND-1_IN2_Signal', 'AND-1_OUT_Signal',
+                 'OR-1_IN1_Signal', 'OR-1_IN2_Signal', 'OR-1_OUT_Signal',
+                 'DnCntr-1_CLOCK_Signal', 'DnCntr-1_LOAD_Signal', 'DnCntr-1_PRESET', 'DnCntr-1_OUT_Signal',
+                 'DivByN-1_ENABLE_Signal', 'DivByN-1_CLOCK_Signal', 'DivByN-1_RESET_Signal', 'DivByN-1_N', 'DivByN-1_OUT_Signal',
+                 'DFF-1_CLOCK_Signal', 'DFF-1_CLEAR_Signal', 'DFF-1_OUT_Signal'
+                 'UpCntr-1_CLOCK_Signal', 'UpCntr-1_CLEAR_Signal', 'UpCntr-1_COUNTS',
+                 'UpCntr-2_CLOCK_Signal', 'UpCntr-2_CLEAR_Signal', 'UpCntr-2_COUNTS',
+                 'UpCntr-3_CLOCK_Signal', 'UpCntr-3_CLEAR_Signal', 'UpCntr-3_COUNTS',
+                 'BUFFER-1_IN_Signal', 'BUFFER-1_OUT_Signal']
 
 detector_args = ['ShutterMode', 'ShutterControl', 'AcquireTime',
                  'AcquirePeriod', 'NumImages', 'TriggerMode',
@@ -2218,7 +2266,7 @@ elif config.stack_choice.get() == 'GPHP':
     mBSZ = Motor('16IDB:m35')
 
     mcs = Struck('16IDB:SIS1:')
-
+    softglue = Device('16IDB:softGlue:', softglue_args)
     bnc = PV('16IDB:cmdReply1_do_IO.AOUT')
 
     # detector commented out for ioc protection
@@ -2227,18 +2275,18 @@ elif config.stack_choice.get() == 'GPHP':
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, pco, bnc, softGlue]
     stage_dict = {
-        'XPS Cen X': ['XPS', mX, mXpco, 's05', '15'],
-        'XPS Cen Y': ['XPS', mY, mYpco, 's04', '15'],
-        'XPS Sam Z': ['XPS', mZ, mZpco, 's03', '15'],
-        'XPS Omega': ['XPS', mW, mWpco, 's02', '15'],
-        'GP Hslit Position': ['MAXV', mHSlit, 'nopco', 'sXX', '1'],
-        'GP Vslit Position': ['MAXV', mVSlit, 'nopco', 'sXX', '2'],
-        'GP LKB Pinhole Y': ['MAXV', mLgPinY, 'nopco', 'sXX', '3'],
-        'GP LKB Pinhole Z': ['MAXV', mLgPinZ, 'nopco', 'sXX', '4'],
-        'GP SKB Pinhole Y': ['MAXV', mSmPinY, 'nopco', 'sXX', '5'],
-        'GP SKB Pinhole Z': ['MAXV', mSmPinZ, 'nopco', 'sXX', '6'],
-        'GP Beamstop Y': ['MAXV', mBSY, 'nopco', 'sXX', '11'],
-        'GP Beamstop Z': ['MAXV', mBSZ, 'nopco', 'sXX', '12']}
+        'XPS Cen X': ['XPS', mX, mXpco, 's05', 'FI15_Signal'],
+        'XPS Cen Y': ['XPS', mY, mYpco, 's04', 'FI15_Signal'],
+        'XPS Sam Z': ['XPS', mZ, mZpco, 's03', 'FI15_Signal'],
+        'XPS Omega': ['XPS', mW, mWpco, 's02', 'FI15_Signal'],
+        'GP Hslit Position': ['MAXV', mHSlit, 'nopco', 'sXX', 'FI1_Signal'],
+        'GP Vslit Position': ['MAXV', mVSlit, 'nopco', 'sXX', 'FI2_Signal'],
+        'GP LKB Pinhole Y': ['MAXV', mLgPinY, 'nopco', 'sXX', 'FI3_Signal'],
+        'GP LKB Pinhole Z': ['MAXV', mLgPinZ, 'nopco', 'sXX', 'FI4_Signal'],
+        'GP SKB Pinhole Y': ['MAXV', mSmPinY, 'nopco', 'sXX', 'FI5_Signal'],
+        'GP SKB Pinhole Z': ['MAXV', mSmPinZ, 'nopco', 'sXX', 'FI6_Signal'],
+        'GP Beamstop Y': ['MAXV', mBSY, 'nopco', 'sXX', 'FI11_Signal'],
+        'GP Beamstop Z': ['MAXV', mBSZ, 'nopco', 'sXX', 'FI12_Signal']}
 
     # create lists for drop-down menus
     fly_list = ['XPS Cen Y', 'XPS Sam Z', 'More']
@@ -2247,6 +2295,71 @@ elif config.stack_choice.get() == 'GPHP':
     more_list = [
         'XPS Cen X',
         'XPS Omega',
+        'GP Hslit Position',
+        'GP Vslit Position',
+        'GP LKB Pinhole Y',
+        'GP LKB Pinhole Z',
+        'GP SKB Pinhole Y',
+        'GP SKB Pinhole Z',
+        'GP Beamstop Y',
+        'GP Beamstop Z']
+
+    counter_list = [
+        'Beamstop diode',
+        'Removable diode',
+        'Hutch reference',
+        'FOE ion chamber',
+        '50 MHz clock']
+
+elif config.stack_choice.get() == 'GPHL':
+    # create epics Motors, pco Devices, Struck, bnc
+    mX = Motor('16IDB:m31')
+    mY = Motor('16IDB:m32')
+    mZ = Motor('16IDB:m5')
+    mW = Motor('XPSGP:m1')
+    mYbase = Motor('16IDB:m4')
+
+    mWpco = Device('XPSGP:m1', pco_args)
+
+    mHSlit = Motor('16IDB:m21')
+    mVSlit = Motor('16IDB:m22')
+    mLgPinY = Motor('16IDB:m19')
+    mLgPinZ = Motor('16IDB:m24')
+    mSmPinY = Motor('16IDB:m17')
+    mSmPinZ = Motor('16IDB:m18')
+    mBSY = Motor('16IDB:m34')
+    mBSZ = Motor('16IDB:m35')
+
+    mcs = Struck('16IDB:SIS1:')
+    softglue = Device('16IDB:softGlue:', softglue_args)
+    bnc = PV('16IDB:cmdReply1_do_IO.AOUT')
+
+    # detector commented out for ioc protection
+    # ###detector = Device('HP1M-PIL1:cam1:', detector_args)
+
+    # create dictionary for valid flyscan motors
+    # 'NAME': [controller, designation, pco, bnc, softGlue]
+    stage_dict = {
+        'GP CEN X': ['MAXV', mX, 'nopco', 'sXX', 'FI7_Signal'],
+        'GP CEN Y': ['MAXV', mY, 'nopco', 'sXX', 'FI8_Signal'],
+        'GP SAM Z': ['MAXV', mZ, 'nopco', 'sXX', 'FI9_Signal'],
+        'GP Omega': ['XPS', mW, mWpco, 's01', 'FI15_Signal'],
+        'GP Hslit Position': ['MAXV', mHSlit, 'nopco', 'sXX', 'FI1_Signal'],
+        'GP Vslit Position': ['MAXV', mVSlit, 'nopco', 'sXX', 'FI2_Signal'],
+        'GP LKB Pinhole Y': ['MAXV', mLgPinY, 'nopco', 'sXX', 'FI3_Signal'],
+        'GP LKB Pinhole Z': ['MAXV', mLgPinZ, 'nopco', 'sXX', 'FI4_Signal'],
+        'GP SKB Pinhole Y': ['MAXV', mSmPinY, 'nopco', 'sXX', 'FI5_Signal'],
+        'GP SKB Pinhole Z': ['MAXV', mSmPinZ, 'nopco', 'sXX', 'FI6_Signal'],
+        'GP Beamstop Y': ['MAXV', mBSY, 'nopco', 'sXX', 'FI11_Signal'],
+        'GP Beamstop Z': ['MAXV', mBSZ, 'nopco', 'sXX', 'FI12_Signal']}
+
+    # create lists for drop-down menus
+    fly_list = ['GP CEN Y', 'GP SAM Z', 'More']
+    step_list = ['GP CEN Y', 'GP SAM Z', 'More', 'Custom']
+
+    more_list = [
+        'GP CEN X',
+        'GP Omega',
         'GP Hslit Position',
         'GP Vslit Position',
         'GP LKB Pinhole Y',
