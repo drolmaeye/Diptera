@@ -36,7 +36,7 @@ class ExpConfigure:
         # set up frames
         self.config_window = Toplevel(master)
         self.config_window.title('Select endstation')
-        self.config_window.geometry('275x500')
+        # self.config_window.geometry('275x500')
         self.frame_stages = Frame(self.config_window)
         self.frame_stages.grid(row=1, column=0, pady=10)
 
@@ -47,15 +47,20 @@ class ExpConfigure:
         self.use_file.set(0)
 
         # set up list to make buttons
+        # ###master stack list###
+        # ###stack_list = [
+        # ###    ('BMB Laue Table', 'BMBLT'),
+        # ###    ('BMB PEC Table', 'BMBPEC'),
+        # ###    ('BMD High Precision', 'BMDHP'),
+        # ###    ('BMD High Load', 'BMDHL'),
+        # ###    ('IDB GP High Precision', 'GPHP'),
+        # ###    ('IDB GP High Load', 'GPHL'),
+        # ###    ('IDB Laser Heating Table', 'IDBLH'),
+        # ###    ('IDD', 'IDD')]
+
         stack_list = [
-            ('BMB Laue Table', 'BMBLT'),
-            ('BMB PEC Table', 'BMBPEC'),
-            ('BMD High Precision', 'BMDHP'),
-            ('BMD High Load', 'BMDHL'),
             ('IDB GP High Precision', 'GPHP'),
-            ('IDB GP High Load', 'GPHL'),
-            ('IDB Laser Heating Table', 'IDBLH'),
-            ('IDD', 'IDD')]
+            ('IDB GP High Load', 'GPHL')]
 
         # make radio buttons for stages using lists
         for stacks, designation in stack_list:
@@ -65,28 +70,28 @@ class ExpConfigure:
             self.motor_buttons.grid(sticky='w', pady=5)
 
         # make option for custom config file
-        self.custom_button = Radiobutton(self.config_window,
-                                         text='Load custom configuration from file',
-                                         variable=self.use_file, value=1)
-        self.custom_button.grid(row=3, column=0, columnspan=2, pady=5)
+        # ###self.custom_button = Radiobutton(self.config_window,
+        # ###                                 text='Load custom configuration from file',
+        # ###                                 variable=self.use_file, value=1)
+        # ###self.custom_button.grid(row=3, column=0, columnspan=2, pady=5)
 
         # make column headings
-        self.stack_head = Label(self.config_window, text='Select one set of stages')
-        self.stack_head.grid(row=0, column=0, pady=5)
+        # ###self.stack_head = Label(self.config_window, text='Select one set of stages')
+        # ###self.stack_head.grid(row=0, column=0, pady=5)
 
         # make confirmation and custom config buttons
         self.confirm_choice = Button(self.config_window, text='Confirm choice',
                                      command=self.confirm_choices)
         self.confirm_choice.grid(row=4, column=0, columnspan=2, pady=10)
-        self.or_label = Label(self.config_window, text='-----OR-----')
-        self.or_label.grid(row=2, column=0, columnspan=2, pady=5)
+        # ###self.or_label = Label(self.config_window, text='-----OR-----')
+        # ###self.or_label.grid(row=2, column=0, columnspan=2, pady=5)
 
     def confirm_choices(self):
         """
         Destroy window, pass control back to root to define devices
         """
         stack = self.stack_choice.get()
-        if stack != 'GPHL':
+        if stack != 'GPHP' and stack != 'GPHL':
             showerror('Under Development',
                       'Those stages are not yet available, program will exit')
             close_quit()
@@ -500,7 +505,7 @@ class ScanActions:
         framePlot.update_idletasks()
         # ###Here is where two phase stepper development comes in for first time### #
         # define temporary EPICS motor devices, fly velocity, and scan endpoints
-        controller, mFly, mFlypco, channel, sg_input = stage_dict[fly_axis.axis.get()]
+        controller, mFly, mFlypco, channel, sg_input, v_max = stage_dict[fly_axis.axis.get()]
         if step_axis.axis.get() in stage_dict:
             mStep = stage_dict[step_axis.axis.get()][1]
         else:
@@ -533,7 +538,7 @@ class ScanActions:
             softglue.put(sg_input, 'motor')
         else:
             # controller must be XPS (for now)
-            temp_velo = fly_axis.step_size.get() / self.exp_time.get()
+            temp_velo = fly_axis.step_size.get()/self.exp_time.get()
             abs_step_plot_min = mStep_ipos + step_axis.rel_min.get()
             abs_step_plot_max = mStep_ipos + step_axis.rel_max.get()
             abs_fly_plot_min = mFly_ipos + fly_axis.rel_min.get() + 0.5*fly_axis.step_size.get()
@@ -548,18 +553,6 @@ class ScanActions:
             softglue.put(sg_input, 'motor')
             # select PCO output to softglue
             bnc.put(channel)
-            # set up pco
-            mFlypco.put('PositionCompareMode', 1, wait=True)
-            mFlypco.put('PositionComparePulseWidth', 1, wait=True)
-            # smallest step below, real step size after endpoints
-            mFlypco.put('PositionCompareStepSize', 0.001, wait=True)
-            if mFlypco.PositionCompareMaxPosition <= abs_fly_min:
-                mFlypco.PositionCompareMaxPosition = abs_fly_max
-                mFlypco.PositionCompareMinPosition = abs_fly_min
-            else:
-                mFlypco.PositionCompareMinPosition = abs_fly_min
-                mFlypco.PositionCompareMaxPosition = abs_fly_max
-            mFlypco.PositionCompareStepSize = fly_axis.step_size.get()
         # initialize core arrays of the proper dimension
         core.FLY = np.linspace(abs_fly_plot_min, abs_fly_plot_max, fly_axis.npts.get() - 1)
         core.STP = np.linspace(abs_step_plot_min, abs_step_plot_max, step_axis.npts.get())
@@ -587,6 +580,32 @@ class ScanActions:
         else:
             showwarning('Limit Check Failed', 'One or more stage target(s) exceed limits')
             return
+        # temp_velo check
+        min_v = mFly.VBAS
+        max_v = v_max
+        if min_v <= temp_velo <= max_v:
+            pass
+        else:
+            print temp_velo
+            min_t = float(fly_axis.step_size.get()/max_v)
+            max_t = float(fly_axis.step_size.get()/min_v)
+            showwarning('Velocity warning',
+                     'Calculated velocity exceeds stage capabilities\n'
+                     'Try a COUNT TIME between %.3f and %.3f seconds.' % (min_t, max_t))
+            return
+        # set up and enable pco ONLY after all checks are successful
+        if controller == 'XPS':
+            mFlypco.put('PositionCompareMode', 1, wait=True)
+            mFlypco.put('PositionComparePulseWidth', 1, wait=True)
+            # smallest step below, real step size after endpoints
+            mFlypco.put('PositionCompareStepSize', 0.001, wait=True)
+            if mFlypco.PositionCompareMaxPosition <= abs_fly_min:
+                mFlypco.PositionCompareMaxPosition = abs_fly_max
+                mFlypco.PositionCompareMinPosition = abs_fly_min
+            else:
+                mFlypco.PositionCompareMinPosition = abs_fly_min
+                mFlypco.PositionCompareMaxPosition = abs_fly_max
+            mFlypco.PositionCompareStepSize = fly_axis.step_size.get()
         # enter for loop for npts flyscans
         for steps in range(step_npts):
             # for dimension > 1, give chance to abort before each pass
@@ -2273,20 +2292,20 @@ elif config.stack_choice.get() == 'GPHP':
     # ###detector = Device('HP1M-PIL1:cam1:', detector_args)
 
     # create dictionary for valid flyscan motors
-    # 'NAME': [controller, designation, pco, bnc, softGlue]
+    # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
     stage_dict = {
-        'XPS Cen X': ['XPS', mX, mXpco, 's05', 'FI15_Signal'],
-        'XPS Cen Y': ['XPS', mY, mYpco, 's04', 'FI15_Signal'],
-        'XPS Sam Z': ['XPS', mZ, mZpco, 's03', 'FI15_Signal'],
-        'XPS Omega': ['XPS', mW, mWpco, 's02', 'FI15_Signal'],
-        'GP Hslit Position': ['MAXV', mHSlit, 'nopco', 'sXX', 'FI1_Signal'],
-        'GP Vslit Position': ['MAXV', mVSlit, 'nopco', 'sXX', 'FI2_Signal'],
-        'GP LKB Pinhole Y': ['MAXV', mLgPinY, 'nopco', 'sXX', 'FI3_Signal'],
-        'GP LKB Pinhole Z': ['MAXV', mLgPinZ, 'nopco', 'sXX', 'FI4_Signal'],
-        'GP SKB Pinhole Y': ['MAXV', mSmPinY, 'nopco', 'sXX', 'FI5_Signal'],
-        'GP SKB Pinhole Z': ['MAXV', mSmPinZ, 'nopco', 'sXX', 'FI6_Signal'],
-        'GP Beamstop Y': ['MAXV', mBSY, 'nopco', 'sXX', 'FI11_Signal'],
-        'GP Beamstop Z': ['MAXV', mBSZ, 'nopco', 'sXX', 'FI12_Signal']}
+        'XPS Cen X': ['XPS', mX, mXpco, 's05', 'FI15_Signal', 2.0],
+        'XPS Cen Y': ['XPS', mY, mYpco, 's04', 'FI15_Signal', 2.0],
+        'XPS Sam Z': ['XPS', mZ, mZpco, 's03', 'FI15_Signal', 2.0],
+        'XPS Omega': ['XPS', mW, mWpco, 's02', 'FI15_Signal', 20.0],
+        'GP Hslit Position': ['MAXV', mHSlit, 'nopco', 'sXX', 'FI1_Signal', 0.05],
+        'GP Vslit Position': ['MAXV', mVSlit, 'nopco', 'sXX', 'FI2_Signal', 0.05],
+        'GP LKB Pinhole Y': ['MAXV', mLgPinY, 'nopco', 'sXX', 'FI3_Signal', 0.3],
+        'GP LKB Pinhole Z': ['MAXV', mLgPinZ, 'nopco', 'sXX', 'FI4_Signal', 0.3],
+        'GP SKB Pinhole Y': ['MAXV', mSmPinY, 'nopco', 'sXX', 'FI5_Signal', 0.3],
+        'GP SKB Pinhole Z': ['MAXV', mSmPinZ, 'nopco', 'sXX', 'FI6_Signal', 0.3],
+        'GP Beamstop Y': ['MAXV', mBSY, 'nopco', 'sXX', 'FI11_Signal', 0.5],
+        'GP Beamstop Z': ['MAXV', mBSZ, 'nopco', 'sXX', 'FI12_Signal', 0.5]}
 
     # create lists for drop-down menus
     fly_list = ['XPS Cen Y', 'XPS Sam Z', 'More']
@@ -2338,20 +2357,20 @@ elif config.stack_choice.get() == 'GPHL':
     # ###detector = Device('HP1M-PIL1:cam1:', detector_args)
 
     # create dictionary for valid flyscan motors
-    # 'NAME': [controller, designation, pco, bnc, softGlue]
+    # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
     stage_dict = {
-        'GP CEN X': ['MAXV', mX, 'nopco', 'sXX', 'FI7_Signal'],
-        'GP CEN Y': ['MAXV', mY, 'nopco', 'sXX', 'FI8_Signal'],
-        'GP SAM Z': ['MAXV', mZ, 'nopco', 'sXX', 'FI9_Signal'],
-        'GP Omega': ['XPS', mW, mWpco, 's01', 'FI15_Signal'],
-        'GP Hslit Position': ['MAXV', mHSlit, 'nopco', 'sXX', 'FI1_Signal'],
-        'GP Vslit Position': ['MAXV', mVSlit, 'nopco', 'sXX', 'FI2_Signal'],
-        'GP LKB Pinhole Y': ['MAXV', mLgPinY, 'nopco', 'sXX', 'FI3_Signal'],
-        'GP LKB Pinhole Z': ['MAXV', mLgPinZ, 'nopco', 'sXX', 'FI4_Signal'],
-        'GP SKB Pinhole Y': ['MAXV', mSmPinY, 'nopco', 'sXX', 'FI5_Signal'],
-        'GP SKB Pinhole Z': ['MAXV', mSmPinZ, 'nopco', 'sXX', 'FI6_Signal'],
-        'GP Beamstop Y': ['MAXV', mBSY, 'nopco', 'sXX', 'FI11_Signal'],
-        'GP Beamstop Z': ['MAXV', mBSZ, 'nopco', 'sXX', 'FI12_Signal']}
+        'GP CEN X': ['MAXV', mX, 'nopco', 'sXX', 'FI7_Signal', 1.0],
+        'GP CEN Y': ['MAXV', mY, 'nopco', 'sXX', 'FI8_Signal', 1.0],
+        'GP SAM Z': ['MAXV', mZ, 'nopco', 'sXX', 'FI9_Signal', 0.025],
+        'GP Omega': ['XPS', mW, mWpco, 's01', 'FI15_Signal', 10.0],
+        'GP Hslit Position': ['MAXV', mHSlit, 'nopco', 'sXX', 'FI1_Signal', 0.05],
+        'GP Vslit Position': ['MAXV', mVSlit, 'nopco', 'sXX', 'FI2_Signal', 0.05],
+        'GP LKB Pinhole Y': ['MAXV', mLgPinY, 'nopco', 'sXX', 'FI3_Signal', 0.3],
+        'GP LKB Pinhole Z': ['MAXV', mLgPinZ, 'nopco', 'sXX', 'FI4_Signal', 0.3],
+        'GP SKB Pinhole Y': ['MAXV', mSmPinY, 'nopco', 'sXX', 'FI5_Signal', 0.3],
+        'GP SKB Pinhole Z': ['MAXV', mSmPinZ, 'nopco', 'sXX', 'FI6_Signal', 0.3],
+        'GP Beamstop Y': ['MAXV', mBSY, 'nopco', 'sXX', 'FI11_Signal', 0.5],
+        'GP Beamstop Z': ['MAXV', mBSZ, 'nopco', 'sXX', 'FI12_Signal', 0.5]}
 
     # create lists for drop-down menus
     fly_list = ['GP CEN Y', 'GP SAM Z', 'More']
