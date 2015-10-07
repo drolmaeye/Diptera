@@ -1179,7 +1179,7 @@ class Position:
             return
         stage = hax.active_stage.get()
         if stage in stage_dict:
-            mH = stage_dict[stage][0]
+            mH = stage_dict[stage][1]
             mH.move(val, wait=True)
         else:
             return
@@ -1192,7 +1192,7 @@ class Position:
                 return
             stage = hax.active_stage.get()
             if stage in stage_dict:
-                mH = stage_dict[stage][0]
+                mH = stage_dict[stage][1]
                 mH.move(val, wait=True)
             else:
                 return
@@ -1205,12 +1205,12 @@ class Position:
             h_stage = hax.active_stage.get()
             v_stage = vax.active_stage.get()
             if h_stage and v_stage in stage_dict:
-                mH = stage_dict[h_stage][0]
+                mH = stage_dict[h_stage][1]
                 mH.move(h_val, wait=True)
-                mV = stage_dict[v_stage][0]
+                mV = stage_dict[v_stage][1]
                 mV.move(v_val, wait=True)
             elif h_stage in stage_dict and not v_stage in stage_dict:
-                mH = stage_dict[h_stage][0]
+                mH = stage_dict[h_stage][1]
                 mH.move(h_val, wait=True)
                 mV = step_axis.mCustom
                 mV.move(v_val, wait=True)
@@ -1224,7 +1224,7 @@ class Position:
             return
         stage = hax.active_stage.get()
         if stage in stage_dict:
-            mH = stage_dict[stage][0]
+            mH = stage_dict[stage][1]
             mH.move(val, wait=True)
         else:
             return
