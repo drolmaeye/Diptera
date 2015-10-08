@@ -597,6 +597,7 @@ class ScanActions:
         if controller == 'XPS':
             mFlypco.put('PositionCompareMode', 1, wait=True)
             mFlypco.put('PositionComparePulseWidth', 1, wait=True)
+            mFlypco.put('PositionCompareSettlingTime', 3, wait=True)
             # smallest step below, real step size after endpoints
             mFlypco.put('PositionCompareStepSize', 0.001, wait=True)
             if mFlypco.PositionCompareMaxPosition <= abs_fly_min:
