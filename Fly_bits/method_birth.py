@@ -4,7 +4,6 @@ from epics import *
 from Tkinter import *
 
 
-
 def initialize():
     global m1
     m1 = Motor('16TEST1:m1')
@@ -21,7 +20,3 @@ button.pack()
 button2 = Button(root, text='get RBV', command=rbv)
 button2.pack()
 root.mainloop()
-
-
-
-
