@@ -254,6 +254,26 @@ class ScanBox:
             self.scan_directory.set(current_directory)
             path_warn()
 
+    def set_directory(self):
+        current_directory = self.scan_directory.get()
+        user_dir = 'W:\\16idb\\2015-3'
+        if user_dir and os.path.exists(user_dir):
+            win_path = os.path.normpath(user_dir)
+            new_directory = win_path + '\\'
+            prefix = new_directory + 'fScan_'
+            index = self.scan_no.get()
+            full_filename = prefix + index + '.npz'
+            if not os.path.isfile(full_filename):
+                pass
+            else:
+                while os.path.isfile(full_filename):
+                    incremented_index = str(int(index) + 1)
+                    index = incremented_index.zfill(3)
+                    full_filename = prefix + index + '.npz'
+            return self.scan_directory.set(new_directory), self.scan_no.set(index)
+        else:
+            self.scan_directory.set(current_directory)
+
     def calc_size(self):
         # should be called on every position validation
         i = self.rel_min.get()
@@ -2542,4 +2562,5 @@ configure_softglue()
 root.update_idletasks()
 root.deiconify()
 action.more_less()
+step_axis.set_directory()
 root.mainloop()
