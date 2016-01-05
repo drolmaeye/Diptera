@@ -242,7 +242,11 @@ class ScanBox:
 
     def choose_directory(self):
         current_directory = self.scan_directory.get()
-        user_dir = askdirectory(title='Select a user directory')
+        if os.path.exists(current_directory):
+            user_dir = askdirectory(initialdir=current_directory,
+                                    title='Select a user directory')
+        else:
+            user_dir = askdirectory(title='Select a user directory')
         if user_dir and os.path.exists(user_dir):
             win_path = os.path.normpath(user_dir)
             new_directory = win_path + '\\'
@@ -252,7 +256,7 @@ class ScanBox:
             if not os.path.isfile(full_filename):
                 pass
             else:
-                # very fast way to find the next file
+                # fast way to find the next file
                 for each in range(4, -1, -1):
                     while os.path.isfile(full_filename):
                         incremented_index = str(int(index) + 10**each)
@@ -261,6 +265,8 @@ class ScanBox:
                     new_index = str(int(index) - 10**each)
                     index = new_index.zfill(3)
                     full_filename = prefix + index + '.npz'
+                final_index = str(int(index) + 1).zfill(3)
+                index = final_index
                 overwrite_warn()
             return self.scan_directory.set(new_directory), self.scan_no.set(index)
         else:
@@ -269,6 +275,7 @@ class ScanBox:
                 path_warn()
 
     def set_directory(self):
+        # called only on program start
         # autofill routine for scan location in zeon
         year = time.strftime('%Y')
         month = time.strftime('%m')
@@ -300,10 +307,18 @@ class ScanBox:
             if not os.path.isfile(full_filename):
                 pass
             else:
-                while os.path.isfile(full_filename):
-                    incremented_index = str(int(index) + 1)
-                    index = incremented_index.zfill(3)
+                # fast way to find the next file
+                for each in range(4, -1, -1):
+                    while os.path.isfile(full_filename):
+                        incremented_index = str(int(index) + 10**each)
+                        index = incremented_index.zfill(3)
+                        full_filename = prefix + index + '.npz'
+                    new_index = str(int(index) - 10**each)
+                    index = new_index.zfill(3)
                     full_filename = prefix + index + '.npz'
+                final_index = str(int(index) + 1).zfill(3)
+                index = final_index
+                overwrite_warn()
             return self.scan_directory.set(new_directory), self.scan_no.set(index)
         else:
             pass
@@ -473,6 +488,12 @@ class ScanActions:
                                            width=25, bg='light blue',
                                            command=self.start_scan)
         self.button_start_flyscan.grid(row=0, column=2, padx=20, pady=5)
+        self.button_fly_y = Button(self.frame, text='Fly y', bg='light blue',
+                                   command=self.fly_y)
+        self.button_fly_y.grid(row=0, column=3, padx=3)
+        self.button_fly_z = Button(self.frame, text='Fly z', bg='light blue',
+                                   command=self.fly_z)
+        self.button_fly_z.grid(row=0, column=4, padx=3)
 
     def exp_time_validate(self, event):
         # value must be float larger than 0.008 (max frequency of PILATUS)
@@ -486,6 +507,16 @@ class ScanActions:
         except ValueError:
             self.exp_time.set('%.3f' % 0.2)
             invalid_entry()
+
+    def fly_y(self):
+        fly_axis.axis.set(fly_list[0])
+        # ###self.start_scan()
+        print 'now scan would start'
+
+    def fly_z(self):
+        fly_axis.axis.set(fly_list[1])
+        # ###self.start_scan()
+        print 'now scan would start'
 
     def start_scan(self):
         t_zero = time.clock()
@@ -806,7 +837,7 @@ class Counters:
         self.ref_flag.set(1)
         self.i_signal.set(counter_list[1])
         self.i_ref.set(counter_list[2])
-        self.scale.set(1.0)
+        self.scale.set(10000)
         self.data_type_list = ['Counts', 'Derivative']
         self.data_type.set(self.data_type_list[0])
         self.max_scale = IntVar()
@@ -1134,8 +1165,13 @@ class Centering:
         else:
             center.button_absolute_x.config(state=NORMAL, background='green')
             staff.button_move_all.config(state=NORMAL, background='green')
-            dsx_plus = float(center.y_plus_pos.get()) - float(center.y_center_pos.get())
-            dsx_minus = float(center.y_minus_pos.get()) - float(center.y_center_pos.get())
+            # ###start test code to account for omega angle error### #
+            ortho_factor = cos(radians(center.delta_w.get()))
+            dsx_plus = ortho_factor*float(center.y_plus_pos.get()) - float(center.y_center_pos.get())
+            dsx_minus = ortho_factor*float(center.y_minus_pos.get()) - float(center.y_center_pos.get())
+            # ###end test code### #
+            # ###dsx_plus = float(center.y_plus_pos.get()) - float(center.y_center_pos.get())
+            # ###dsx_minus = float(center.y_minus_pos.get()) - float(center.y_center_pos.get())
             delta_x = (dsx_plus - dsx_minus)/2/(sin(radians(center.delta_w.get())))
             delta_y = (dsx_plus + dsx_minus)/2/(cos(radians(center.delta_w.get()))-1)
             delta_y_base = -delta_y
@@ -1173,7 +1209,6 @@ class Centering:
         if not self.c_flag.get():
             self.button_absolute_x.config(state=DISABLED, background='SystemButtonFace')
             staff.button_move_all.config(state=DISABLED, background='SystemButtonFace')
-
 
 
 class Position:
@@ -1491,7 +1526,7 @@ class DataLoad:
             return
         cpath, cfile = os.path.split(current_file)[0], os.path.split(current_file)[1]
         current_number = int(cfile[6:-4])
-        new_file = cpath + '/fScan_' + str(current_number - 1) + '.npz'
+        new_file = cpath + '/fScan_' + str(current_number - 1).zfill(3) + '.npz'
         print new_file
         if os.path.isfile(new_file):
             print 'made it here'
@@ -1505,7 +1540,7 @@ class DataLoad:
             return
         cpath, cfile = os.path.split(current_file)[0], os.path.split(current_file)[1]
         current_number = int(cfile[6:-4])
-        new_file = cpath + '/fScan_' + str(current_number + 1) + '.npz'
+        new_file = cpath + '/fScan_' + str(current_number + 1).zfill(3) + '.npz'
         print new_file
         if os.path.isfile(new_file):
             print 'made it here'
@@ -1762,10 +1797,13 @@ class Staff:
         self.label_pv_asymmetry.grid(row=1, rowspan=2, column=6, padx=5, pady=5)
         self.label_pv_fwhm = Label(self.frame_fit, textvariable=self.pv_fwhm, width=7, relief=SUNKEN)
         self.label_pv_fwhm.grid(row=1, rowspan=2, column=7, padx=5, pady=5)
-        self.label_pv_beamsize = Entry(self.frame_fit, textvariable=self.pv_beamsize, width=7)
+        self.label_pv_beamsize = Label(self.frame_fit, textvariable=self.pv_beamsize, width=7, relief=SUNKEN)
         self.label_pv_beamsize.grid(row=1, rowspan=2, column=8, padx=5, pady=5)
-        self.label_pv_beamsize.bind('<FocusOut>', self.find_width)
-        self.label_pv_beamsize.bind('<Return>', self.find_width)
+        # changing baemsize from entry to label
+        # ###self.label_pv_beamsize = Entry(self.frame_fit, textvariable=self.pv_beamsize, width=7)
+        # ###self.label_pv_beamsize.grid(row=1, rowspan=2, column=8, padx=5, pady=5)
+        # ###self.label_pv_beamsize.bind('<FocusOut>', self.find_width)
+        # ###self.label_pv_beamsize.bind('<Return>', self.find_width)
 
         # make frame_center headings
         self.head_label = Label(self.frame_center, text='FULL CENTERING CONTROL')
@@ -1808,47 +1846,49 @@ class Staff:
         # hide window on startup
         self.popup.withdraw()
 
-    def find_width(self, *event):
-        staff.area_calc = 1
-        target = staff.pv_beamsize.get()
-        new_mid = staff.pv_x0.get()
-        new_min = new_mid - 0.008
-        new_max = new_mid + 0.008
-        step = 0.002
-        initial = staff.area / staff.pv_a.get()
-        if initial - target > 0:
-            direction = -1
-        else:
-            direction = 1
-        for i in range(100):
-            current = staff.area / staff.pv_a.get()
-            difference = current - target
-            if abs(difference) > 0.001:
-                if difference > 0 and direction == -1:
-                    direction = -1
-                elif difference < 0 and direction == 1:
-                    direction = 1
-                elif difference < 0 and direction == -1:
-                    step *= 0.4
-                    direction = 1
-                elif difference > 0 and direction == 1:
-                    step *= 0.4
-                    direction = -1
-                new_min -= step*direction
-                new_max += step*direction
-                hax.min_pos.set(new_min)
-                hax.max_pos.set(new_max)
-                beamsize_integral()
-            else:
-                if i:
-                    hax.min_pos.set('%.4f' % new_min)
-                    hax.mid_pos.set('%.4f' % new_mid)
-                    hax.max_pos.set('%.4f' % new_max)
-                    print i
-                    print difference
-                    update_plot()
-                staff.area_calc = 0
-                break
+    # method below was ONLY used for beam fraction as an entry
+    # but I don't like it so I am taking it out January 2016
+    # def find_width(self, *event):
+    #     staff.area_calc = 1
+    #     target = staff.pv_beamsize.get()
+    #     new_mid = staff.pv_x0.get()
+    #     new_min = new_mid - 0.008
+    #     new_max = new_mid + 0.008
+    #     step = 0.002
+    #     initial = staff.area / staff.pv_a.get()
+    #     if initial - target > 0:
+    #         direction = -1
+    #     else:
+    #         direction = 1
+    #     for i in range(100):
+    #         current = staff.area / staff.pv_a.get()
+    #         difference = current - target
+    #         if abs(difference) > 0.001:
+    #             if difference > 0 and direction == -1:
+    #                 direction = -1
+    #             elif difference < 0 and direction == 1:
+    #                 direction = 1
+    #             elif difference < 0 and direction == -1:
+    #                 step *= 0.4
+    #                 direction = 1
+    #             elif difference > 0 and direction == 1:
+    #                 step *= 0.4
+    #                 direction = -1
+    #             new_min -= step*direction
+    #             new_max += step*direction
+    #             hax.min_pos.set(new_min)
+    #             hax.max_pos.set(new_max)
+    #             beamsize_integral()
+    #         else:
+    #             if i:
+    #                 hax.min_pos.set('%.4f' % new_min)
+    #                 hax.mid_pos.set('%.4f' % new_mid)
+    #                 hax.max_pos.set('%.4f' % new_max)
+    #                 print i
+    #                 print difference
+    #                 update_plot()
+    #             staff.area_calc = 0
+    #             break
 
     def calc_mixes(self):
         wl = self.pv_wl.get()
@@ -2179,7 +2219,8 @@ def update_plot(*args):
     # ###vax.width.set('')
     plt.clf()
     # plot it!
-    plt.xlabel('Fly axis:  ' + fly_axis.axis.get())
+    # ###plt.xlabel('Fly axis:  ' + fly_axis.axis.get())
+    plt.xlabel('Fly axis:  ' + hax.active_stage.get())
     if core.dimension == 1 or data.slice_flag.get():
         plt.ylabel('Intensity')
         for each in array_list:
@@ -2287,7 +2328,8 @@ def update_plot(*args):
                 else:
                     plt.plot(each.FLY, each.SCA, marker='.', ls='-')
     else:
-        plt.ylabel('Step axis:  ' + step_axis.axis.get())
+        # plt.ylabel('Step axis:  ' + step_axis.axis.get())
+        plt.ylabel('Step axis:  ' + vax.active_stage.get())
         # test intensity scaling
         area_min = np.amin(core.SCA)
         area_max = np.amax(core.SCA)
@@ -2331,7 +2373,7 @@ root.title('Diptera')
 root.withdraw()
 config = ExpConfigure(root)
 # line below can be commented in/out and edited for autoconfig
-# ###config.stack_choice.set('enter stack designation here, e.g., IDBLH')
+config.stack_choice.set('IDBLH')
 if not config.stack_choice.get() == NONE:
     config.config_window.destroy()
 else:
