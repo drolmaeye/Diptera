@@ -6,8 +6,8 @@ from Tkinter import *
 
 def initialize():
     global m1
-    m1 = Motor('16TEST1:m1')
-    return m1
+    m1 = Motor('16TEST1:m9')
+    # return m1
 
 
 def rbv():

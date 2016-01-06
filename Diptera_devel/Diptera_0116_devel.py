@@ -16,7 +16,6 @@ import numpy as np
 from math import cos, sin, radians, pi, sqrt
 from scipy import exp, integrate
 from scipy.optimize import curve_fit
-import datetime
 import fabio
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
@@ -581,6 +580,7 @@ class ScanActions:
         hax.mid_pos.set('')
         hax.max_pos.set('')
         hax.width.set('')
+        hax.delta_pos.set('')
         vax.min_pos.set('')
         vax.mid_pos.set('')
         vax.max_pos.set('')
@@ -1018,7 +1018,7 @@ class Images:
         self.head_images.grid(row=0, column=0, columnspan=2, pady=5, sticky='w')
 
         # make and place widgets
-        self.check_image_enable = Checkbutton(self.frame, text='Enable', variable=self.flag)
+        self.check_image_enable = Checkbutton(self.frame, text='Enable', variable=self.flag, state=DISABLED)
         self.check_image_enable.grid(row=1, rowspan=2, column=0, columnspan=2)
         self.label_det_path = Label(self.frame, text='Detector path')
         self.label_det_path.grid(row=0, column=2, padx=5, pady=5)
@@ -1048,8 +1048,17 @@ class Images:
         self.button_path_select = Button(self.frame, text='Browse',
                                          command=self.choose_directory)
         self.button_path_select.grid(row=1, column=6, padx=5)
+        self.button_initialize = Button(self.frame, text='Initialize', command=self.initialize)
+        self.button_initialize.grid(row=3, column=0)
         self.cbox_activate_dioptas = Checkbutton(self.frame, text='Enable Dioptas', variable=self.dioptas_flag)
         self.cbox_activate_dioptas.grid(row=3, column=3, padx=5, pady=5)
+
+    def initialize(self):
+        self.check_image_enable.configure(state=NORMAL)
+        # ###global detector
+        # ###detector = Device('HP1M-PIL1:cam1:', detector_args)
+        # ###detector.add_callback('FilePath_RBV', callback=path_put)
+        # ###path_put()
 
     def choose_directory(self):
         user_dir = askdirectory(title='Select a user directory')
@@ -1221,12 +1230,14 @@ class Position:
         self.min_pos = StringVar()
         self.mid_pos = StringVar()
         self.max_pos = StringVar()
+        self.delta_pos = StringVar()
         self.width = StringVar()
         self.active_stage.set('None')
 
         # setup trace on relevant values
         self.min_pos.trace('w', self.calc_width)
         self.max_pos.trace('w', self.calc_width)
+        self.mid_pos.trace('w', self.calc_difference)
 
         # make column headings
         if label == 'Horizontal axis':
@@ -1255,15 +1266,17 @@ class Position:
             self.button_mid_pos.grid(row=1, column=4, padx=7)
             self.button_max_pos = Button(self.frame, textvariable=self.max_pos, command=self.move_max, width=7, fg='blue')
             self.button_max_pos.grid(row=1, column=5, padx=6)
+            self.label_width = Label(self.frame, textvariable=self.width, relief=SUNKEN, width=8)
+            self.label_width.grid(row=1, column=6, padx=5)
         else:
-            self.label_min_pos = Label(self.frame, textvariable=self.min_pos, relief=SUNKEN, width=8)
+            self.label_min_pos = Label(self.frame, textvariable=self.min_pos, width=8)
             self.label_min_pos.grid(row=1, column=3, padx=5)
             self.label_mid_pos = Label(self.frame, textvariable=self.mid_pos, relief=SUNKEN, width=8, fg='red')
             self.label_mid_pos.grid(row=1, column=4, padx=5)
-            self.label_max_pos = Label(self.frame, textvariable=self.max_pos, relief=SUNKEN, width=8)
+            self.label_max_pos = Label(self.frame, textvariable=self.max_pos, width=8)
             self.label_max_pos.grid(row=1, column=5, padx=5)
-        self.label_width = Label(self.frame, textvariable=self.width, relief=SUNKEN, width=8)
-        self.label_width.grid(row=1, column=6, padx=5)
+            self.label_width = Label(self.frame, textvariable=self.width, width=8)
+            self.label_width.grid(row=1, column=6, padx=5)
 
     def calc_width(self, *args):
         if core.dimension == 1 or data.slice_flag.get():
@@ -1272,20 +1285,59 @@ class Position:
             except ValueError:
                 return
 
+    def calc_difference(self, *args):
+        if core.dimension == 1 or data.slice_flag.get():
+            try:
+                final_pos = float(hax.mid_pos.get())
+            except ValueError:
+                return
+            stage = hax.active_stage.get()
+            if stage in stage_dict:
+                mH = stage_dict[stage][1]
+                initial_pos = mH.RBV
+                difference = final_pos - initial_pos
+                self.delta_pos.set('%.4f' % difference)
+            else:
+                return
+
+
+    # January 2016: for three methods below, modify code to move v axis
+    # for dimension > 1.
     def move_min(self):
-        try:
-            val = float(hax.min_pos.get())
-        except ValueError:
-            return
-        stage = hax.active_stage.get()
-        if stage in stage_dict:
-            mH = stage_dict[stage][1]
-            mH.move(val, wait=True)
+        if core.dimension == 1:
+            try:
+                val = float(hax.min_pos.get())
+            except ValueError:
+                return
+            stage = hax.active_stage.get()
+            if stage in stage_dict:
+                mH = stage_dict[stage][1]
+                mH.move(val, wait=True)
+            else:
+                return
         else:
-            return
+            try:
+                h_val = float(hax.min_pos.get())
+                v_val = float(vax.mid_pos.get())
+            except ValueError:
+                return
+            h_stage = hax.active_stage.get()
+            v_stage = vax.active_stage.get()
+            if h_stage and v_stage in stage_dict:
+                mH = stage_dict[h_stage][1]
+                mH.move(h_val, wait=True)
+                mV = stage_dict[v_stage][1]
+                mV.move(v_val, wait=True)
+            elif h_stage in stage_dict and not v_stage in stage_dict:
+                mH = stage_dict[h_stage][1]
+                mH.move(h_val, wait=True)
+                mV = step_axis.mCustom
+                mV.move(v_val, wait=True)
+            else:
+                return
 
     def move_mid(self):
-        if core.dimension == 1 or data.slice_flag.get():
+        if core.dimension == 1:
             try:
                 val = float(hax.mid_pos.get())
             except ValueError:
@@ -1318,16 +1370,37 @@ class Position:
                 return
 
     def move_max(self):
-        try:
-            val = float(hax.max_pos.get())
-        except ValueError:
-            return
-        stage = hax.active_stage.get()
-        if stage in stage_dict:
-            mH = stage_dict[stage][1]
-            mH.move(val, wait=True)
+        if core.dimension == 1:
+            try:
+                val = float(hax.max_pos.get())
+            except ValueError:
+                return
+            stage = hax.active_stage.get()
+            if stage in stage_dict:
+                mH = stage_dict[stage][1]
+                mH.move(val, wait=True)
+            else:
+                return
         else:
-            return
+            try:
+                h_val = float(hax.max_pos.get())
+                v_val = float(vax.mid_pos.get())
+            except ValueError:
+                return
+            h_stage = hax.active_stage.get()
+            v_stage = vax.active_stage.get()
+            if h_stage and v_stage in stage_dict:
+                mH = stage_dict[h_stage][1]
+                mH.move(h_val, wait=True)
+                mV = stage_dict[v_stage][1]
+                mV.move(v_val, wait=True)
+            elif h_stage in stage_dict and not v_stage in stage_dict:
+                mH = stage_dict[h_stage][1]
+                mH.move(h_val, wait=True)
+                mV = step_axis.mCustom
+                mV.move(v_val, wait=True)
+            else:
+                return
 
 
 class Actions:
@@ -2197,6 +2270,7 @@ def update_plot(*args):
     if data.slice_flag.get() and core.dimension > 1:
         index = data.current_slice.get() - 1
         core.SCA = core.SCA[index]
+        step_axis_pos = core.STP[index]
         for each in array_list:
             if each == core:
                 pass
@@ -2204,22 +2278,22 @@ def update_plot(*args):
                 if each.plot_flag.get():
                     index = each.overlay_slice.get() - 1
                     each.SCA = each.SCA[index]
-    # clear fields and plot
     # ###if staff.area_calc:
     # ###    x_left = float(hax.min_pos.get())
     # ###    x_right = float(hax.max_pos.get())
     # ###    x_mid = staff.pv_x0.get()
-    # ###hax.min_pos.set('')
-    # ###hax.mid_pos.set('')
-    # ###hax.max_pos.set('')
-    # ###hax.width.set('')
-    # ###vax.min_pos.set('')
-    # ###vax.mid_pos.set('')
-    # ###vax.max_pos.set('')
-    # ###vax.width.set('')
+    # clear fields and plot
+    hax.min_pos.set('')
+    hax.mid_pos.set('')
+    hax.max_pos.set('')
+    hax.width.set('')
+    hax.delta_pos.set('')
+    vax.min_pos.set('')
+    vax.mid_pos.set('')
+    vax.max_pos.set('')
+    vax.width.set('')
     plt.clf()
     # plot it!
-    # ###plt.xlabel('Fly axis:  ' + fly_axis.axis.get())
     plt.xlabel('Fly axis:  ' + hax.active_stage.get())
     if core.dimension == 1 or data.slice_flag.get():
         plt.ylabel('Intensity')
@@ -2240,11 +2314,11 @@ def update_plot(*args):
                 m = (f2 - f1)/(x2 - x1)
                 x_mid = (f_mid - f1)/m + x1
                 mid_list.append(x_mid)
-        if staff.area_calc:
-            x_left = float(hax.min_pos.get())
-            x_right = float(hax.max_pos.get())
-            x_mid = staff.pv_x0.get()
-        elif len(mid_list) < 2:
+        # ###if staff.area_calc:
+        # ###    x_left = float(hax.min_pos.get())
+        # ###    x_right = float(hax.max_pos.get())
+        # ###    x_mid = staff.pv_x0.get()
+        if len(mid_list) < 2:
             x_min = np.amin(core.FLY)
             x_max = np.amax(core.FLY)
             x_span = (x_max - x_min)
@@ -2259,7 +2333,6 @@ def update_plot(*args):
         #     vax.min_pos.set('%.4f' % f_min)
         #     vax.mid_pos.set('%.4f' % f_mid)
         #     vax.max_pos.set('%.4f' % f_max)
-        # test autofill
         if center.c_flag.get():
             if data.current_slice.get() == 1:
                 center.y_minus_pos.set('%.4f' % x_mid)
@@ -2268,7 +2341,6 @@ def update_plot(*args):
             elif data.current_slice.get() == 3:
                 center.y_plus_pos.set('%.4f' % x_mid)
             center.calc_deltas()
-        # test over
         core.h_min = plt.axhline(f_min)
         core.h_mid = plt.axhline(f_mid, ls='--', c='r')
         core.h_max = plt.axhline(f_max)
@@ -2278,6 +2350,8 @@ def update_plot(*args):
         core.v_min = plt.axvline(x_left)
         core.v_mid = plt.axvline(x_mid, ls='--', c='r')
         core.v_max = plt.axvline(x_right)
+        if core.dimension > 1:
+            vax.mid_pos.set('%.4f' % step_axis_pos)
         hlist = [core.h_min, core.h_max]
         vlist = [core.v_min, core.v_max]
         core.dhls = []
@@ -2328,9 +2402,8 @@ def update_plot(*args):
                 else:
                     plt.plot(each.FLY, each.SCA, marker='.', ls='-')
     else:
-        # plt.ylabel('Step axis:  ' + step_axis.axis.get())
         plt.ylabel('Step axis:  ' + vax.active_stage.get())
-        # test intensity scaling
+        # intensity scaling
         area_min = np.amin(core.SCA)
         area_max = np.amax(core.SCA)
         area_range = area_max - area_min
@@ -2338,28 +2411,28 @@ def update_plot(*args):
         cf_max = area_min + area_range*counter.max_scale.get()*0.01
         levels = counter.levels.get() + 1
         V = np.linspace(cf_min, cf_max, levels)
-        # N = counter.max_scale.get()
+        # plot filled contour
         plt.contourf(core.FLY, core.STP, core.SCA, V)
-        # plt.contourf(core.FLY, core.STP, core.SCA, 64)
         plt.colorbar()
+        # get and display plot middle coordinates
         halfx = (plt.xlim()[1] + plt.xlim()[0])/2
         halfy = (plt.ylim()[1] + plt.ylim()[0])/2
         hax.mid_pos.set('%.4f' % halfx)
         vax.mid_pos.set('%.4f' % halfy)
+        # work out indices
         xind = np.abs(core.FLY - halfx).argmin()
         yind = np.abs(core.STP - halfy).argmin()
         data.current_slice.set(yind+1)
         fly_axis_length = core.FLY.shape[0]
         image_index = yind*fly_axis_length + xind + 1
         data.index.set(image_index)
-        # grid test
+        # grid option
         if image.grid_flag.get():
             eh = plt.gca()
             eh.set_yticks(core.STP, minor=True)
             eh.set_xticks(core.FLY, minor=True)
             eh.yaxis.grid(True, which='minor')
             eh.xaxis.grid(True, which='minor')
-        # test finished, it works, tweak display positions, develop toggle
     plt.gcf().canvas.draw()
     print 'update done'
 
@@ -2440,9 +2513,6 @@ elif config.stack_choice.get() == 'GPHP':
     softglue = Device('16IDB:softGlue:', softglue_args)
     bnc = PV('16IDB:cmdReply1_do_IO.AOUT')
 
-    # detector commented out for ioc protection
-    # ###detector = Device('HP1M-PIL1:cam1:', detector_args)
-
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
     stage_dict = {
@@ -2505,9 +2575,6 @@ elif config.stack_choice.get() == 'GPHL':
     softglue = Device('16IDB:softGlue:', softglue_args)
     bnc = PV('16IDB:cmdReply1_do_IO.AOUT')
 
-    # detector commented out for ioc protection
-    # ###detector = Device('HP1M-PIL1:cam1:', detector_args)
-
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
     stage_dict = {
@@ -2559,9 +2626,6 @@ elif config.stack_choice.get() == 'IDBLH':
     softglue = Device('16IDB:softGlue:', softglue_args)
     bnc = PV('16IDB:cmdReply1_do_IO.AOUT')
 
-    # detector commented out for ioc protection
-    # ###detector = Device('HP1M-PIL1:cam1:', detector_args)
-
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
     stage_dict = {
@@ -2579,7 +2643,6 @@ elif config.stack_choice.get() == 'IDBLH':
         'FOE ion chamber',
         '50 MHz clock']
 
-# ###detector.add_callback('FilePath_RBV', callback=path_put)
 # Primary frames for displaying objects
 framePlot = Frame(root)
 framePlot.grid(row=0, rowspan=4, column=0, sticky='n')
@@ -2610,7 +2673,6 @@ toolbar.grid(row=1, column=0, sticky='ew')
 # initialize core data
 core = CoreData()
 
-
 # collections of objects to put in frames above
 fly_axis = ScanBox(frameScanBox, label='Fly axis')
 step_axis = ScanBox(frameScanBox, label='Step axis')
@@ -2627,14 +2689,20 @@ over2 = Overlay(frameOverlays, label='over2')
 over3 = Overlay(frameOverlays, label='over3')
 staff = Staff(root)
 
-# temporary!!!!
-cbox_enable_grid = Checkbutton(framePlot, text='Overlay 2D Grid', variable=image.grid_flag, command=update_plot)
-cbox_enable_grid.grid(row=1, column=0, sticky='s')
+# next eight lines are temporary home for widgets in the plot area
+inner_frame = Frame(framePlot)
+inner_frame.grid(row=1, column=0, sticky='s')
+cbox_enable_grid = Checkbutton(inner_frame, text='Overlay 2D Grid', variable=image.grid_flag, command=update_plot)
+cbox_enable_grid.grid(row=0, column=0, padx=20)
+difference_text = Label(inner_frame, text='Difference')
+difference_text.grid(row=0, column=1, padx=5)
+difference_label = Label(inner_frame, textvariable=hax.delta_pos, relief=SUNKEN, width=8)
+difference_label.grid(row=0, column=2)
+# end temporary home for widgets
+
 cid = fig.canvas.mpl_connect('button_press_event', onclick)
 root.protocol('WM_DELETE_WINDOW', close_quit)
 staff.popup.protocol('WM_DELETE_WINDOW', hide_window)
-# ###path_put()
-# configure_softglue()
 root.update_idletasks()
 root.deiconify()
 action.more_less()
