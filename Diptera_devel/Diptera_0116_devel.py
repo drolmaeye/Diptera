@@ -2442,7 +2442,7 @@ def update_plot(*args):
         levels = counter.levels.get() + 1
         V = np.linspace(cf_min, cf_max, levels)
         # plot filled contour
-        plt.contourf(core.FLY, core.STP, core.SCA, V)
+        plt.contourf(core.FLY, core.STP, core.SCA, V, cmap=None)
         plt.colorbar()
         # get and display plot middle coordinates
         halfx = (plt.xlim()[1] + plt.xlim()[0])/2
