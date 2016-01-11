@@ -798,11 +798,27 @@ class ScanActions:
                 image.image_no.set(str_image_number.zfill(3))
                 detector.FileNumber = image_number
             # handle data
-            TIM_ara = mcs.readmca(1)
-            FOE_ara = mcs.readmca(5)
-            REF_ara = mcs.readmca(4)
-            BSD_ara = mcs.readmca(6)
-            RMD_ara = mcs.readmca(3)
+            stack = config.stack_choice.get()
+            if stack == 'BMDHL':
+                TIM_ara = mcs.readmca(1)
+                FOE_ara = mcs.readmca(2)
+                REF_ara = mcs.readmca(2)
+                BSD_ara = mcs.readmca(6)
+                RMD_ara = mcs.readmca(3)
+            else:
+                # stack belongs to IDB
+                TIM_ara = mcs.readmca(1)
+                FOE_ara = mcs.readmca(5)
+                REF_ara = mcs.readmca(4)
+                BSD_ara = mcs.readmca(6)
+                RMD_ara = mcs.readmca(3)
+            # ###replace below in future
+            # ###elif stack == 'GPHP' or stack == 'GPHL' or stack == 'IDBLH':
+            # ###    TIM_ara = mcs.readmca(1)
+            # ###    FOE_ara = mcs.readmca(5)
+            # ###    REF_ara = mcs.readmca(4)
+            # ###    BSD_ara = mcs.readmca(6)
+            # ###    RMD_ara = mcs.readmca(3)
             TIM_ara_bit = TIM_ara[:fly_axis.npts.get() - 1]
             FOE_ara_bit = FOE_ara[:fly_axis.npts.get() - 1]
             REF_ara_bit = REF_ara[:fly_axis.npts.get() - 1]
@@ -2520,18 +2536,63 @@ if config.use_file.get():
     exec user_config.read()
     user_config.close()
 # hard-encoded configuration options
+elif config.stack_choice.get() == 'BMDHL':
+    # create epics Motors, pco Devices, Struck, bnc
+    mX = Motor('16BMD:m38')
+    mY = Motor('16BMD:m39')
+    mZ = Motor('16BMD:m13')
+    mW = Motor('16BMD:m37')
+    mYbase = Motor('16BMD:m36')
+
+    mMonoX = Motor('16BMD:m67')
+    mPinY = Motor('16BMD:m33')
+    mPinZ = Motor('16BMD:m54')
+
+    mcs = Struck('16BMD:SIS1:')
+    softglue = Device('16BMD:softGlue:', softglue_args)
+    sg_config = Device('16BMD:softGlue:', sg_config_args)
+
+    # create dictionary for valid flyscan motors
+    # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
+    stage_dict = {
+        'Mono X Translation': ['MAXV', mMonoX, 'nopco', 'sXX', 'FIxx_Signal', 0.2],
+        'Sample X': ['MAXV', mX, 'nopco', 'sXX', 'FIxx_Signal', 0.25],
+        'Sample Y': ['MAXV', mY, 'nopco', 'sXX', 'FIxx_Signal', 0.25],
+        'Sample Z': ['MAXV', mZ, 'nopco', 'sXX', 'FIxx_Signal', 0.015],
+        'Omega': ['MAXV', mW, 'nopco', 'sXX', 'FIxx_Signal', 2],
+        'Pinhole y': ['MAXV', mPinY, 'nopco', 'sXX', 'FIxx_Signal', 0.25],
+        'Pinhole z': ['MAXV', mPinZ, 'nopco', 'sXX', 'FIxx_Signal', 0.25]}
+
+    # create lists for drop-down menus
+    fly_list = ['Sample Y', 'Sample Z', 'More']
+    step_list = ['Sample Y', 'Sample Z', 'More', 'Custom']
+
+    more_list = [
+        'Sample X',
+        'Omega',
+        'Pinhole y',
+        'Pinhole z',
+        'Mono X Translation']
+
+    counter_list = [
+        'Beamstop diode',
+        'Removable diode',
+        'Hutch reference',
+        'FOE ion chamber',
+        '50 MHz clock']
+
 elif config.stack_choice.get() == 'GPHP':
     # create epics Motors, pco Devices, Struck, bnc
-    mX = Motor('XPSGP:m5')
-    mY = Motor('XPSGP:m4')
+    mX = Motor('XPSGP:m1')
+    mY = Motor('XPSGP:m2')
     mZ = Motor('XPSGP:m3')
-    mW = Motor('XPSGP:m2')
+    mW = Motor('XPSGP:m4')
     mYbase = Motor('16IDB:m4')
 
-    mXpco = Device('XPSGP:m5', pco_args)
-    mYpco = Device('XPSGP:m4', pco_args)
+    mXpco = Device('XPSGP:m1', pco_args)
+    mYpco = Device('XPSGP:m2', pco_args)
     mZpco = Device('XPSGP:m3', pco_args)
-    mWpco = Device('XPSGP:m2', pco_args)
+    mWpco = Device('XPSGP:m4', pco_args)
 
     mHSlit = Motor('16IDB:m21')
     mVSlit = Motor('16IDB:m22')
@@ -2590,10 +2651,10 @@ elif config.stack_choice.get() == 'GPHL':
     mX = Motor('16IDB:m31')
     mY = Motor('16IDB:m32')
     mZ = Motor('16IDB:m5')
-    mW = Motor('XPSGP:m1')
+    mW = Motor('XPSGP:m5')
     mYbase = Motor('16IDB:m4')
 
-    mWpco = Device('XPSGP:m1', pco_args)
+    mWpco = Device('XPSGP:m5', pco_args)
 
     mHSlit = Motor('16IDB:m21')
     mVSlit = Motor('16IDB:m22')
