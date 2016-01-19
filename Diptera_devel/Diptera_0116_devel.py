@@ -509,13 +509,11 @@ class ScanActions:
 
     def fly_y(self):
         fly_axis.axis.set(fly_list[0])
-        # ###self.start_scan()
-        print 'now scan would start'
+        self.start_scan()
 
     def fly_z(self):
         fly_axis.axis.set(fly_list[1])
-        # ###self.start_scan()
-        print 'now scan would start'
+        self.start_scan()
 
     def start_scan(self):
         t_zero = time.clock()
@@ -675,7 +673,7 @@ class ScanActions:
         else:
             showwarning('Limit Check Failed', 'One or more stage target(s) exceed limits')
             self.exp_time.set('%.3f' % perm_count)
-            self.entry_exp_time.configure(bg='light_blue')
+            self.entry_exp_time.configure(bg='light blue')
             return
         # end of pre-flight checks, scan will now proceed unless aborted
         # clear plot and fields
@@ -768,6 +766,8 @@ class ScanActions:
             mcs.put('LNEOutputDelay', 0, wait=True)
             mcs.put('LNEOutputWidth', 1e-6, wait=True)
             mcs.NuseAll = fly_axis.npts.get() - 1
+            # reset softglue for fresh counting
+            softglue.put('BUFFER-1_IN_Signal', '1!', wait=True)
             # initialize detector if necessary
             if image.flag.get():
                 prefix = image.user_path.get() + image.sample_name.get() + '_'
@@ -851,7 +851,7 @@ class ScanActions:
         mFly.move(mFly_ipos, wait=True)
         mStep.move(mStep_ipos, wait=True)
         self.exp_time.set('%.3f' % perm_count)
-        self.entry_exp_time.configure(bg='light_blue')
+        self.entry_exp_time.configure(bg='light blue')
         np.savez(path,
                  dim=core.dimension,
                  v_act=v_active,
