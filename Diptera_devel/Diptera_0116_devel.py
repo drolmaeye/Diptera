@@ -573,7 +573,7 @@ class ScanActions:
             v_active = 'Counts'
         core.dimension = step_npts
         # define temporary EPICS motor devices, fly velocity, and scan endpoints
-        controller, mFly, mFlypco, channel, sg_input, v_max = stage_dict[fly_axis.axis.get()]
+        controller, mFly, mFlypco, sg_input, v_max = stage_dict[fly_axis.axis.get()]
         if step_axis.axis.get() in stage_dict:
             mStep = stage_dict[step_axis.axis.get()][1]
         else:
@@ -2555,13 +2555,13 @@ elif config.stack_choice.get() == 'BMDHL':
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
     stage_dict = {
-        'Mono X Translation': ['MAXV', mMonoX, 'nopco', 'sXX', 'FIxx_Signal', 0.2],
-        'Sample X': ['MAXV', mX, 'nopco', 'sXX', 'FIxx_Signal', 0.25],
-        'Sample Y': ['MAXV', mY, 'nopco', 'sXX', 'FIxx_Signal', 0.25],
-        'Sample Z': ['MAXV', mZ, 'nopco', 'sXX', 'FIxx_Signal', 0.015],
-        'Omega': ['MAXV', mW, 'nopco', 'sXX', 'FIxx_Signal', 2],
-        'Pinhole y': ['MAXV', mPinY, 'nopco', 'sXX', 'FIxx_Signal', 0.25],
-        'Pinhole z': ['MAXV', mPinZ, 'nopco', 'sXX', 'FIxx_Signal', 0.25]}
+        'Mono X Translation': ['MAXV', mMonoX, 'nopco', 'FIxx_Signal', 0.2],
+        'Sample X': ['MAXV', mX, 'nopco', 'FIxx_Signal', 0.25],
+        'Sample Y': ['MAXV', mY, 'nopco', 'FIxx_Signal', 0.25],
+        'Sample Z': ['MAXV', mZ, 'nopco', 'FIxx_Signal', 0.015],
+        'Omega': ['MAXV', mW, 'nopco', 'FIxx_Signal', 2],
+        'Pinhole y': ['MAXV', mPinY, 'nopco', 'FIxx_Signal', 0.25],
+        'Pinhole z': ['MAXV', mPinZ, 'nopco', 'FIxx_Signal', 0.25]}
 
     # create lists for drop-down menus
     fly_list = ['Sample Y', 'Sample Z', 'More']
@@ -2610,18 +2610,18 @@ elif config.stack_choice.get() == 'GPHP':
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
     stage_dict = {
-        'XPS Cen X': ['XPS', mX, mXpco, 's05', 'FI15_Signal', 2.0],
-        'XPS Cen Y': ['XPS', mY, mYpco, 's04', 'FI15_Signal', 2.0],
-        'XPS Sam Z': ['XPS', mZ, mZpco, 's03', 'FI15_Signal', 2.0],
-        'XPS Omega': ['XPS', mW, mWpco, 's02', 'FI15_Signal', 20.0],
-        'GP Hslit Position': ['MAXV', mHSlit, 'nopco', 'sXX', 'FI1_Signal', 0.05],
-        'GP Vslit Position': ['MAXV', mVSlit, 'nopco', 'sXX', 'FI2_Signal', 0.05],
-        'GP LKB Pinhole Y': ['MAXV', mLgPinY, 'nopco', 'sXX', 'FI3_Signal', 0.3],
-        'GP LKB Pinhole Z': ['MAXV', mLgPinZ, 'nopco', 'sXX', 'FI4_Signal', 0.3],
-        'GP SKB Pinhole Y': ['MAXV', mSmPinY, 'nopco', 'sXX', 'FI5_Signal', 0.3],
-        'GP SKB Pinhole Z': ['MAXV', mSmPinZ, 'nopco', 'sXX', 'FI6_Signal', 0.3],
-        'GP Beamstop Y': ['MAXV', mBSY, 'nopco', 'sXX', 'FI11_Signal', 0.5],
-        'GP Beamstop Z': ['MAXV', mBSZ, 'nopco', 'sXX', 'FI12_Signal', 0.5]}
+        'XPS Cen X': ['XPS', mX, mXpco, 'FI1_Signal', 2.0],
+        'XPS Cen Y': ['XPS', mY, mYpco, 'FI1_Signal', 2.0],
+        'XPS Sam Z': ['XPS', mZ, mZpco, 'FI1_Signal', 2.0],
+        'XPS Omega': ['XPS', mW, mWpco, 'FI1_Signal', 20.0],
+        'GP Hslit Position': ['MAXV', mHSlit, 'nopco', 'FI5_Signal', 0.05],
+        'GP Vslit Position': ['MAXV', mVSlit, 'nopco', 'FI6_Signal', 0.05],
+        'GP LKB Pinhole Y': ['MAXV', mLgPinY, 'nopco', 'FI7_Signal', 0.3],
+        'GP LKB Pinhole Z': ['MAXV', mLgPinZ, 'nopco', 'FI8_Signal', 0.3],
+        'GP SKB Pinhole Y': ['MAXV', mSmPinY, 'nopco', 'FI9_Signal', 0.3],
+        'GP SKB Pinhole Z': ['MAXV', mSmPinZ, 'nopco', 'FI10_Signal', 0.3],
+        'GP Beamstop Y': ['MAXV', mBSY, 'nopco', 'FI15_Signal', 0.5],
+        'GP Beamstop Z': ['MAXV', mBSZ, 'nopco', 'FI16_Signal', 0.5]}
 
     # create lists for drop-down menus
     fly_list = ['XPS Cen Y', 'XPS Sam Z', 'More']
@@ -2672,18 +2672,18 @@ elif config.stack_choice.get() == 'GPHL':
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
     stage_dict = {
-        'GP CEN X': ['MAXV', mX, 'nopco', 'sXX', 'FI7_Signal', 1.0],
-        'GP CEN Y': ['MAXV', mY, 'nopco', 'sXX', 'FI8_Signal', 1.0],
-        'GP SAM Z': ['MAXV', mZ, 'nopco', 'sXX', 'FI9_Signal', 0.025],
-        'GP Omega': ['XPS', mW, mWpco, 's01', 'FI15_Signal', 10.0],
-        'GP Hslit Position': ['MAXV', mHSlit, 'nopco', 'sXX', 'FI1_Signal', 0.05],
-        'GP Vslit Position': ['MAXV', mVSlit, 'nopco', 'sXX', 'FI2_Signal', 0.05],
-        'GP LKB Pinhole Y': ['MAXV', mLgPinY, 'nopco', 'sXX', 'FI3_Signal', 0.3],
-        'GP LKB Pinhole Z': ['MAXV', mLgPinZ, 'nopco', 'sXX', 'FI4_Signal', 0.3],
-        'GP SKB Pinhole Y': ['MAXV', mSmPinY, 'nopco', 'sXX', 'FI5_Signal', 0.3],
-        'GP SKB Pinhole Z': ['MAXV', mSmPinZ, 'nopco', 'sXX', 'FI6_Signal', 0.3],
-        'GP Beamstop Y': ['MAXV', mBSY, 'nopco', 'sXX', 'FI11_Signal', 0.5],
-        'GP Beamstop Z': ['MAXV', mBSZ, 'nopco', 'sXX', 'FI12_Signal', 0.5]}
+        'GP CEN X': ['MAXV', mX, 'nopco', 'FI11_Signal', 1.0],
+        'GP CEN Y': ['MAXV', mY, 'nopco', 'FI12_Signal', 1.0],
+        'GP SAM Z': ['MAXV', mZ, 'nopco', 'FI13_Signal', 0.025],
+        'GP Omega': ['XPS', mW, mWpco, 's01', 'FI1_Signal', 10.0],
+        'GP Hslit Position': ['MAXV', mHSlit, 'nopco', 'FI5_Signal', 0.05],
+        'GP Vslit Position': ['MAXV', mVSlit, 'nopco', 'FI6_Signal', 0.05],
+        'GP LKB Pinhole Y': ['MAXV', mLgPinY, 'nopco', 'FI7_Signal', 0.3],
+        'GP LKB Pinhole Z': ['MAXV', mLgPinZ, 'nopco', 'FI8_Signal', 0.3],
+        'GP SKB Pinhole Y': ['MAXV', mSmPinY, 'nopco', 'FI9_Signal', 0.3],
+        'GP SKB Pinhole Z': ['MAXV', mSmPinZ, 'nopco', 'FI10_Signal', 0.3],
+        'GP Beamstop Y': ['MAXV', mBSY, 'nopco', 'FI15_Signal', 0.5],
+        'GP Beamstop Z': ['MAXV', mBSZ, 'nopco', 'FI16_Signal', 0.5]}
 
     # create lists for drop-down menus
     fly_list = ['GP CEN Y', 'GP SAM Z', 'More']
@@ -2723,8 +2723,8 @@ elif config.stack_choice.get() == 'IDBLH':
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
     stage_dict = {
-        'LH CEN Y': ['MAXV', mY, 'nopco', 'sXX', 'FI13_Signal', 0.3],
-        'LH SAM Z': ['MAXV', mZ, 'nopco', 'sXX', 'FI14_Signal', 0.5]}
+        'LH CEN Y': ['MAXV', mY, 'nopco', 'FI13_Signal', 0.3],
+        'LH SAM Z': ['MAXV', mZ, 'nopco', 'FI14_Signal', 0.5]}
 
     # create lists for drop-down menus
     fly_list = ['LH CEN Y', 'LH SAM Z']
