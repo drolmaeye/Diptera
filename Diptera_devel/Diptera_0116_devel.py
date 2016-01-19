@@ -626,6 +626,7 @@ class ScanActions:
             accl_distance = accl_steps*resolution
             fly_zero = abs_fly_min - accl_distance
             fly_final = abs_fly_max + accl_distance
+            accl_plus_fly_steps = (abs_fly_max - fly_zero)/resolution
         else:
             # controller must be XPS (for now)
             temp_velo = fly_axis.step_size.get()/self.exp_time.get()
@@ -713,8 +714,9 @@ class ScanActions:
             # load softglue config
             sg_config.put('name2', 'step_master', wait=True)
             sg_config.put('loadConfig2.PROC', 1, wait=True)
-            softglue.put('DnCntr-1_PRESET', accl_steps)
-            softglue.put('DivByN-1_N', micro_steps)
+            softglue.put('DnCntr-1_PRESET', accl_steps, wait=True)
+            softglue.put('DnCntr-2_PRESET', accl_plus_fly_steps, wait=True)
+            softglue.put('DivByN-1_N', micro_steps, wait=True)
         else:
             # controller must be XPS (for now)
             mFlypco.put('PositionCompareMode', 1, wait=True)
@@ -730,8 +732,11 @@ class ScanActions:
                 mFlypco.PositionCompareMaxPosition = abs_fly_max
             mFlypco.PositionCompareStepSize = fly_axis.step_size.get()
             # load softglue config
-            sg_config.put('name2', 'XPS_master', wait=True)
+            sg_config.put('name2', 'xps_master', wait=True)
             sg_config.put('loadConfig2.PROC', 1, wait=True)
+            # calculate number of 8 MHz ticks for half scan time pulse block
+            block_counts = scan.exp_time.get()*8000000/2
+            softglue.put('DnCntr-2_PRESET', block_counts, wait=True)
         softglue.put(sg_input, 'motor', wait=True)
         softglue.put('BUFFER-1_IN_Signal', '1!', wait=True)
         # enter for loop for npts flyscans
@@ -2492,7 +2497,7 @@ root.title('Diptera')
 root.withdraw()
 config = ExpConfigure(root)
 # line below can be commented in/out and edited for autoconfig
-config.stack_choice.set('IDBLH')
+# config.stack_choice.set('IDBLH')
 if not config.stack_choice.get() == NONE:
     config.config_window.destroy()
 else:
@@ -2550,7 +2555,7 @@ elif config.stack_choice.get() == 'BMDHL':
 
     mcs = Struck('16BMD:SIS1:')
     softglue = Device('16BMD:softGlue:', softglue_args)
-    sg_config = Device('16BMD:softGlue:', sg_config_args)
+    sg_config = Device('16BMD:SGMenu:', sg_config_args)
 
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
@@ -2605,7 +2610,7 @@ elif config.stack_choice.get() == 'GPHP':
 
     mcs = Struck('16IDB:SIS1:')
     softglue = Device('16IDB:softGlue:', softglue_args)
-    sg_config = Device('16IDB:softGlue:', sg_config_args)
+    sg_config = Device('16IDB:SGMenu:', sg_config_args)
 
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
@@ -2667,7 +2672,7 @@ elif config.stack_choice.get() == 'GPHL':
 
     mcs = Struck('16IDB:SIS1:')
     softglue = Device('16IDB:softGlue:', softglue_args)
-    sg_config = Device('16IDB:softGlue:', sg_config_args)
+    sg_config = Device('16IDB:SGMenu:', sg_config_args)
 
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
@@ -2718,7 +2723,7 @@ elif config.stack_choice.get() == 'IDBLH':
 
     mcs = Struck('16IDB:SIS1:')
     softglue = Device('16IDB:softGlue:', softglue_args)
-    sg_config = Device('16IDB:softGlue:', sg_config_args)
+    sg_config = Device('16IDB:SGMenu:', sg_config_args)
 
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
