@@ -2230,8 +2230,7 @@ def beamsize_integral():
 
 
 def path_put(**kwargs):
-    pass
-    # ###image.det_path.set(detector.get('FilePath_RBV', as_string=True))
+    image.det_path.set(detector.get('FilePath_RBV', as_string=True))
 
 
 def configure_softglue():
