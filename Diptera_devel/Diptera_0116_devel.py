@@ -571,7 +571,7 @@ class ScanActions:
             v_active = 'Counts'
         core.dimension = step_npts
         # define temporary EPICS motor devices, fly velocity, and scan endpoints
-        controller, mFly, mFlypco, sg_input, v_max = stage_dict[fly_axis.axis.get()]
+        controller, mFly, mFlypco, channel, sg_input, v_max = stage_dict[fly_axis.axis.get()]
         if step_axis.axis.get() in stage_dict:
             mStep = stage_dict[step_axis.axis.get()][1]
         else:
@@ -729,6 +729,8 @@ class ScanActions:
                 mFlypco.PositionCompareMinPosition = abs_fly_min
                 mFlypco.PositionCompareMaxPosition = abs_fly_max
             mFlypco.PositionCompareStepSize = fly_axis.step_size.get()
+            # route PCO to softglue using 10-1
+            bnc.put(channel)
             # load softglue config
             sg_config.put('name2', 'xps_master', wait=True)
             sg_config.put('loadConfig2.PROC', 1, wait=True)
@@ -2559,13 +2561,13 @@ elif config.stack_choice.get() == 'BMDHL':
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
     stage_dict = {
-        'Mono X Translation': ['MAXV', mMonoX, 'nopco', 'FIxx_Signal', 0.2],
-        'Sample X': ['MAXV', mX, 'nopco', 'FIxx_Signal', 0.25],
-        'Sample Y': ['MAXV', mY, 'nopco', 'FIxx_Signal', 0.25],
-        'Sample Z': ['MAXV', mZ, 'nopco', 'FIxx_Signal', 0.015],
-        'Omega': ['MAXV', mW, 'nopco', 'FIxx_Signal', 2],
-        'Pinhole y': ['MAXV', mPinY, 'nopco', 'FIxx_Signal', 0.25],
-        'Pinhole z': ['MAXV', mPinZ, 'nopco', 'FIxx_Signal', 0.25]}
+        'Mono X Translation': ['MAXV', mMonoX, 'nopco', 'sxx', 'FIxx_Signal', 0.2],
+        'Sample X': ['MAXV', mX, 'nopco', 'sxx', 'FIxx_Signal', 0.25],
+        'Sample Y': ['MAXV', mY, 'nopco', 'sxx', 'FIxx_Signal', 0.25],
+        'Sample Z': ['MAXV', mZ, 'nopco', 'sxx', 'FIxx_Signal', 0.015],
+        'Omega': ['MAXV', mW, 'nopco', 'sxx', 'FIxx_Signal', 2],
+        'Pinhole y': ['MAXV', mPinY, 'nopco', 'sxx', 'FIxx_Signal', 0.25],
+        'Pinhole z': ['MAXV', mPinZ, 'nopco', 'sxx', 'FIxx_Signal', 0.25]}
 
     # create lists for drop-down menus
     fly_list = ['Sample Y', 'Sample Z', 'More']
@@ -2610,22 +2612,23 @@ elif config.stack_choice.get() == 'GPHP':
     mcs = Struck('16IDB:SIS1:')
     softglue = Device('16IDB:softGlue:', softglue_args)
     sg_config = Device('16IDB:SGMenu:', sg_config_args)
+    bnc = PV('16IDB:cmdReply1_do_IO.AOUT')
 
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
     stage_dict = {
-        'XPS Cen X': ['XPS', mX, mXpco, 'FI1_Signal', 2.0],
-        'XPS Cen Y': ['XPS', mY, mYpco, 'FI1_Signal', 2.0],
-        'XPS Sam Z': ['XPS', mZ, mZpco, 'FI1_Signal', 2.0],
-        'XPS Omega': ['XPS', mW, mWpco, 'FI1_Signal', 20.0],
-        'GP Hslit Position': ['MAXV', mHSlit, 'nopco', 'FI5_Signal', 0.05],
-        'GP Vslit Position': ['MAXV', mVSlit, 'nopco', 'FI6_Signal', 0.05],
-        'GP LKB Pinhole Y': ['MAXV', mLgPinY, 'nopco', 'FI7_Signal', 0.3],
-        'GP LKB Pinhole Z': ['MAXV', mLgPinZ, 'nopco', 'FI8_Signal', 0.3],
-        'GP SKB Pinhole Y': ['MAXV', mSmPinY, 'nopco', 'FI9_Signal', 0.3],
-        'GP SKB Pinhole Z': ['MAXV', mSmPinZ, 'nopco', 'FI10_Signal', 0.3],
-        'GP Beamstop Y': ['MAXV', mBSY, 'nopco', 'FI15_Signal', 0.5],
-        'GP Beamstop Z': ['MAXV', mBSZ, 'nopco', 'FI16_Signal', 0.5]}
+        'XPS Cen X': ['XPS', mX, mXpco, 's01', 'FI1_Signal', 2.0],
+        'XPS Cen Y': ['XPS', mY, mYpco, 's02', 'FI1_Signal', 2.0],
+        'XPS Sam Z': ['XPS', mZ, mZpco, 's03', 'FI1_Signal', 2.0],
+        'XPS Omega': ['XPS', mW, mWpco, 's04', 'FI1_Signal', 20.0],
+        'GP Hslit Position': ['MAXV', mHSlit, 'nopco', 'sxx', 'FI5_Signal', 0.05],
+        'GP Vslit Position': ['MAXV', mVSlit, 'nopco', 'sxx', 'FI6_Signal', 0.05],
+        'GP LKB Pinhole Y': ['MAXV', mLgPinY, 'nopco', 'sxx', 'FI7_Signal', 0.3],
+        'GP LKB Pinhole Z': ['MAXV', mLgPinZ, 'nopco', 'sxx', 'FI8_Signal', 0.3],
+        'GP SKB Pinhole Y': ['MAXV', mSmPinY, 'nopco', 'sxx', 'FI9_Signal', 0.3],
+        'GP SKB Pinhole Z': ['MAXV', mSmPinZ, 'nopco', 'sxx', 'FI10_Signal', 0.3],
+        'GP Beamstop Y': ['MAXV', mBSY, 'nopco', 'sxx', 'FI15_Signal', 0.5],
+        'GP Beamstop Z': ['MAXV', mBSZ, 'nopco', 'sxx', 'FI16_Signal', 0.5]}
 
     # create lists for drop-down menus
     fly_list = ['XPS Cen Y', 'XPS Sam Z', 'More']
@@ -2672,22 +2675,23 @@ elif config.stack_choice.get() == 'GPHL':
     mcs = Struck('16IDB:SIS1:')
     softglue = Device('16IDB:softGlue:', softglue_args)
     sg_config = Device('16IDB:SGMenu:', sg_config_args)
+    bnc = PV('16IDB:cmdReply1_do_IO.AOUT')
 
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
     stage_dict = {
-        'GP CEN X': ['MAXV', mX, 'nopco', 'FI11_Signal', 1.0],
-        'GP CEN Y': ['MAXV', mY, 'nopco', 'FI12_Signal', 1.0],
-        'GP SAM Z': ['MAXV', mZ, 'nopco', 'FI13_Signal', 0.025],
-        'GP Omega': ['XPS', mW, mWpco, 's01', 'FI1_Signal', 10.0],
-        'GP Hslit Position': ['MAXV', mHSlit, 'nopco', 'FI5_Signal', 0.05],
-        'GP Vslit Position': ['MAXV', mVSlit, 'nopco', 'FI6_Signal', 0.05],
-        'GP LKB Pinhole Y': ['MAXV', mLgPinY, 'nopco', 'FI7_Signal', 0.3],
-        'GP LKB Pinhole Z': ['MAXV', mLgPinZ, 'nopco', 'FI8_Signal', 0.3],
-        'GP SKB Pinhole Y': ['MAXV', mSmPinY, 'nopco', 'FI9_Signal', 0.3],
-        'GP SKB Pinhole Z': ['MAXV', mSmPinZ, 'nopco', 'FI10_Signal', 0.3],
-        'GP Beamstop Y': ['MAXV', mBSY, 'nopco', 'FI15_Signal', 0.5],
-        'GP Beamstop Z': ['MAXV', mBSZ, 'nopco', 'FI16_Signal', 0.5]}
+        'GP CEN X': ['MAXV', mX, 'nopco', 'sxx', 'FI11_Signal', 1.0],
+        'GP CEN Y': ['MAXV', mY, 'nopco', 'sxx', 'FI12_Signal', 1.0],
+        'GP SAM Z': ['MAXV', mZ, 'nopco', 'sxx', 'FI13_Signal', 0.025],
+        'GP Omega': ['XPS', mW, mWpco, 's05', 'FI1_Signal', 10.0],
+        'GP Hslit Position': ['MAXV', mHSlit, 'nopco', 'sxx', 'FI5_Signal', 0.05],
+        'GP Vslit Position': ['MAXV', mVSlit, 'nopco', 'sxx', 'FI6_Signal', 0.05],
+        'GP LKB Pinhole Y': ['MAXV', mLgPinY, 'nopco', 'sxx', 'FI7_Signal', 0.3],
+        'GP LKB Pinhole Z': ['MAXV', mLgPinZ, 'nopco', 'sxx', 'FI8_Signal', 0.3],
+        'GP SKB Pinhole Y': ['MAXV', mSmPinY, 'nopco', 'sxx', 'FI9_Signal', 0.3],
+        'GP SKB Pinhole Z': ['MAXV', mSmPinZ, 'nopco', 'sxx', 'FI10_Signal', 0.3],
+        'GP Beamstop Y': ['MAXV', mBSY, 'nopco', 'sxx', 'FI15_Signal', 0.5],
+        'GP Beamstop Z': ['MAXV', mBSZ, 'nopco', 'sxx', 'FI16_Signal', 0.5]}
 
     # create lists for drop-down menus
     fly_list = ['GP CEN Y', 'GP SAM Z', 'More']
@@ -2723,12 +2727,13 @@ elif config.stack_choice.get() == 'IDBLH':
     mcs = Struck('16IDB:SIS1:')
     softglue = Device('16IDB:softGlue:', softglue_args)
     sg_config = Device('16IDB:SGMenu:', sg_config_args)
+    bnc = PV('16IDB:cmdReply1_do_IO.AOUT')
 
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
     stage_dict = {
-        'LH CEN Y': ['MAXV', mY, 'nopco', 'FI13_Signal', 0.3],
-        'LH SAM Z': ['MAXV', mZ, 'nopco', 'FI14_Signal', 0.5]}
+        'LH CEN Y': ['MAXV', mY, 'nopco', 'sxx', 'FI13_Signal', 0.3],
+        'LH SAM Z': ['MAXV', mZ, 'nopco', 'sxx', 'FI14_Signal', 0.5]}
 
     # create lists for drop-down menus
     fly_list = ['LH CEN Y', 'LH SAM Z']
