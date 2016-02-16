@@ -337,10 +337,10 @@ class ScanBox:
                 fly_axis.flag.set(1)
                 fly_axis.led.config(state=NORMAL)
                 # print 'normal'
-            # ###elif quotient[0] == 0 and round(quotient[1], 0) == msize:
-            # ###    fly_axis.flag.set(1)
-            # ###    fly_axis.led.config(state=NORMAL)
-            # ###    print 'special'
+            elif quotient[0] == 0 and round(quotient[1], 0) == msize:
+                fly_axis.flag.set(1)
+                fly_axis.led.config(state=NORMAL)
+                # print 'special'
             else:
                 fly_axis.flag.set(0)
                 fly_axis.led.config(state=DISABLED)
@@ -888,7 +888,7 @@ class Counters:
         self.scale = DoubleVar()
         self.data_type = StringVar()
         self.ref_flag.set(1)
-        self.i_signal.set(counter_list[1])
+        self.i_signal.set(counter_list[0])
         self.i_ref.set(counter_list[2])
         self.scale.set(10000)
         self.data_type_list = ['Counts', 'Derivative']
@@ -1229,8 +1229,8 @@ class Centering:
             staff.button_move_all.config(state=NORMAL, background='green')
             # ###start test code to account for omega angle error### #
             ortho_factor = cos(radians(center.delta_w.get()))
-            dsx_plus = ortho_factor*float(center.y_plus_pos.get()) - float(center.y_center_pos.get())
-            dsx_minus = ortho_factor*float(center.y_minus_pos.get()) - float(center.y_center_pos.get())
+            dsx_plus = ortho_factor*(float(center.y_plus_pos.get()) - float(center.y_center_pos.get()))
+            dsx_minus = ortho_factor*(float(center.y_minus_pos.get()) - float(center.y_center_pos.get()))
             # ###end test code### #
             # ###dsx_plus = float(center.y_plus_pos.get()) - float(center.y_center_pos.get())
             # ###dsx_minus = float(center.y_minus_pos.get()) - float(center.y_center_pos.get())
