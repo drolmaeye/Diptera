@@ -676,6 +676,11 @@ class ScanActions:
             self.entry_exp_time.configure(bg='light blue')
             return
         # end of pre-flight checks, scan will now proceed unless aborted
+        # disable scan buttons so only one scan can be started
+        # ALso provide indication that scan is taking place
+        self.button_start_flyscan.config(state=DISABLED, text='Scanning . . .')
+        self.button_fly_y.config(state=DISABLED)
+        self.button_fly_z.config(state=DISABLED)
         # clear plot and fields
         plt.clf()
         data.current_slice.set(1)
@@ -804,38 +809,54 @@ class ScanActions:
                 str_image_number = str(image_number)
                 image.image_no.set(str_image_number.zfill(3))
                 detector.FileNumber = image_number
-            # handle data
-            stack = config.stack_choice.get()
-            if stack == 'BMDHL':
-                TIM_ara = mcs.readmca(1)
-                FOE_ara = mcs.readmca(2)
-                REF_ara = mcs.readmca(2)
-                BSD_ara = mcs.readmca(6)
-                RMD_ara = mcs.readmca(3)
+            # Feb 2016: Check enough pulses received, if not, notify user and recover
+            pulses = softglue.get('UpCntr-2_COUNTS')
+            if pulses >= fly_axis.npts.get():
+                # handle data
+                stack = config.stack_choice.get()
+                if stack == 'BMDHL':
+                    TIM_ara = mcs.readmca(1)
+                    FOE_ara = mcs.readmca(2)
+                    REF_ara = mcs.readmca(2)
+                    BSD_ara = mcs.readmca(6)
+                    RMD_ara = mcs.readmca(3)
+                else:
+                    # stack belongs to IDB
+                    TIM_ara = mcs.readmca(1)
+                    FOE_ara = mcs.readmca(5)
+                    REF_ara = mcs.readmca(4)
+                    BSD_ara = mcs.readmca(6)
+                    RMD_ara = mcs.readmca(3)
+                # ###replace below in future
+                # ###elif stack == 'GPHP' or stack == 'GPHL' or stack == 'IDBLH':
+                # ###    TIM_ara = mcs.readmca(1)
+                # ###    FOE_ara = mcs.readmca(5)
+                # ###    REF_ara = mcs.readmca(4)
+                # ###    BSD_ara = mcs.readmca(6)
+                # ###    RMD_ara = mcs.readmca(3)
+                TIM_ara_bit = TIM_ara[:fly_axis.npts.get() - 1]
+                FOE_ara_bit = FOE_ara[:fly_axis.npts.get() - 1]
+                REF_ara_bit = REF_ara[:fly_axis.npts.get() - 1]
+                BSD_ara_bit = BSD_ara[:fly_axis.npts.get() - 1]
+                RMD_ara_bit = RMD_ara[:fly_axis.npts.get() - 1]
+                core.TIM[steps] = TIM_ara_bit
+                core.FOE[steps] = FOE_ara_bit
+                core.REF[steps] = REF_ara_bit
+                core.BSD[steps] = BSD_ara_bit
+                core.RMD[steps] = RMD_ara_bit
+                # move next four line after if/else
+                # ###mFly.VELO = perm_velo
+                # ###mFly.BDST = perm_bdst
+                # ###time.sleep(.25)
+                # ###update_plot()
+                # try this for not responding, possibly remove
+                # ###framePlot.update()
             else:
-                # stack belongs to IDB
-                TIM_ara = mcs.readmca(1)
-                FOE_ara = mcs.readmca(5)
-                REF_ara = mcs.readmca(4)
-                BSD_ara = mcs.readmca(6)
-                RMD_ara = mcs.readmca(3)
-            # ###replace below in future
-            # ###elif stack == 'GPHP' or stack == 'GPHL' or stack == 'IDBLH':
-            # ###    TIM_ara = mcs.readmca(1)
-            # ###    FOE_ara = mcs.readmca(5)
-            # ###    REF_ara = mcs.readmca(4)
-            # ###    BSD_ara = mcs.readmca(6)
-            # ###    RMD_ara = mcs.readmca(3)
-            TIM_ara_bit = TIM_ara[:fly_axis.npts.get() - 1]
-            FOE_ara_bit = FOE_ara[:fly_axis.npts.get() - 1]
-            REF_ara_bit = REF_ara[:fly_axis.npts.get() - 1]
-            BSD_ara_bit = BSD_ara[:fly_axis.npts.get() - 1]
-            RMD_ara_bit = RMD_ara[:fly_axis.npts.get() - 1]
-            core.TIM[steps] = TIM_ara_bit
-            core.FOE[steps] = FOE_ara_bit
-            core.REF[steps] = REF_ara_bit
-            core.BSD[steps] = BSD_ara_bit
-            core.RMD[steps] = RMD_ara_bit
+                showwarning('Pulse Count Error', message=('Stage failed to generate enough pulses \n'
+                            'Please try the following: \n'
+                            'Reduce count time, e.g., to 0.020 s\n'
+                            'Increase step size, e.g., greater than 0.001\n'
+                            'Ask you local contact for assistance'))
             mFly.VELO = perm_velo
             mFly.BDST = perm_bdst
             time.sleep(.25)
@@ -854,24 +875,29 @@ class ScanActions:
         mStep.move(mStep_ipos, wait=True)
         self.exp_time.set('%.3f' % perm_count)
         self.entry_exp_time.configure(bg='light blue')
-        np.savez(path,
-                 dim=core.dimension,
-                 v_act=v_active,
-                 h_act=h_active,
-                 fly=core.FLY,
-                 stp=core.STP,
-                 tim=core.TIM,
-                 foe=core.FOE,
-                 ref=core.REF,
-                 bsd=core.BSD,
-                 rmd=core.RMD)
-        new_index = str(int(index) + 1)
-        step_axis.scan_no.set(new_index.zfill(3))
+        # only save data from successful scan
+        if pulses >= fly_axis.npts.get():
+            np.savez(path,
+                     dim=core.dimension,
+                     v_act=v_active,
+                     h_act=h_active,
+                     fly=core.FLY,
+                     stp=core.STP,
+                     tim=core.TIM,
+                     foe=core.FOE,
+                     ref=core.REF,
+                     bsd=core.BSD,
+                     rmd=core.RMD)
+            new_index = str(int(index) + 1)
+            step_axis.scan_no.set(new_index.zfill(3))
         step_axis.flag.set(0)
         if center.c_flag.get():
             data.current_slice.set(1)
             data.slice_flag.set(1)
             update_plot()
+        self.button_start_flyscan.config(state=NORMAL, text='START SCAN')
+        self.button_fly_y.config(state=NORMAL)
+        self.button_fly_z.config(state=NORMAL)
         t_elapsed = time.clock() - t_zero
         print t_elapsed
 
@@ -1161,7 +1187,6 @@ class Images:
         temp_image.write(temp_name)
 
 
-
 class Centering:
     def __init__(self, master):
         self.frame = Frame(master)
@@ -1355,7 +1380,7 @@ class Position:
 
 
     # January 2016: for three methods below, modify code to move v axis
-    # for dimension > 1.
+    # for dimension > 1, but not in centering mode!! (confusing for user).
     def move_min(self):
         if core.dimension == 1:
             try:
@@ -1380,7 +1405,8 @@ class Position:
                 mH = stage_dict[h_stage][1]
                 mH.move(h_val, wait=True)
                 mV = stage_dict[v_stage][1]
-                mV.move(v_val, wait=True)
+                if not mV == mW:
+                    mV.move(v_val, wait=True)
             elif h_stage in stage_dict and not v_stage in stage_dict:
                 mH = stage_dict[h_stage][1]
                 mH.move(h_val, wait=True)
@@ -1413,7 +1439,8 @@ class Position:
                 mH = stage_dict[h_stage][1]
                 mH.move(h_val, wait=True)
                 mV = stage_dict[v_stage][1]
-                mV.move(v_val, wait=True)
+                if not mV == mW:
+                    mV.move(v_val, wait=True)
             elif h_stage in stage_dict and not v_stage in stage_dict:
                 mH = stage_dict[h_stage][1]
                 mH.move(h_val, wait=True)
@@ -1446,7 +1473,8 @@ class Position:
                 mH = stage_dict[h_stage][1]
                 mH.move(h_val, wait=True)
                 mV = stage_dict[v_stage][1]
-                mV.move(v_val, wait=True)
+                if not mV == mW:
+                    mV.move(v_val, wait=True)
             elif h_stage in stage_dict and not v_stage in stage_dict:
                 mH = stage_dict[h_stage][1]
                 mH.move(h_val, wait=True)
