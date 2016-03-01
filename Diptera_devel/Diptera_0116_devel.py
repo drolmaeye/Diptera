@@ -97,7 +97,7 @@ class ExpConfigure:
         """
         stack = self.stack_choice.get()
         # valid list below created January 2016
-        valid_list = ['GPHP', 'GPHL', 'IDBLH']
+        valid_list = ['BMDHL', 'GPHP', 'GPHL', 'IDBLH']
         if stack not in valid_list:
             showerror('Under Development',
                       'Those stages are not yet available, program will exit')
@@ -289,7 +289,7 @@ class ScanBox:
         if stack == 'BMBLT':
             zeon_prefix = 'BMB TBD'
         elif stack == 'BMDHL':
-            zeon_prefix = 'BMD TBD'
+            zeon_prefix = 'X:\\saveData\\16bmd\\'
         elif stack == 'GPHL' or stack == 'GPHP' or stack == 'IDBLH':
             zeon_prefix = 'W:\\16idb\\'
         else:
@@ -2589,13 +2589,13 @@ elif config.stack_choice.get() == 'BMDHL':
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
     stage_dict = {
-        'Mono X Translation': ['MAXV', mMonoX, 'nopco', 'sxx', 'FIxx_Signal', 0.2],
-        'Sample X': ['MAXV', mX, 'nopco', 'sxx', 'FIxx_Signal', 0.25],
-        'Sample Y': ['MAXV', mY, 'nopco', 'sxx', 'FIxx_Signal', 0.25],
-        'Sample Z': ['MAXV', mZ, 'nopco', 'sxx', 'FIxx_Signal', 0.015],
-        'Omega': ['MAXV', mW, 'nopco', 'sxx', 'FIxx_Signal', 2],
-        'Pinhole y': ['MAXV', mPinY, 'nopco', 'sxx', 'FIxx_Signal', 0.25],
-        'Pinhole z': ['MAXV', mPinZ, 'nopco', 'sxx', 'FIxx_Signal', 0.25]}
+        'Sample X': ['MAXV', mX, 'nopco', 'sxx', 'FI1_Signal', 0.25],
+        'Sample Y': ['MAXV', mY, 'nopco', 'sxx', 'FI2_Signal', 0.25],
+        'Sample Z': ['MAXV', mZ, 'nopco', 'sxx', 'FI3_Signal', 0.015],
+        'Omega': ['MAXV', mW, 'nopco', 'sxx', 'FI4_Signal', 2],
+        'Pinhole y': ['MAXV', mPinY, 'nopco', 'sxx', 'FI5_Signal', 0.25],
+        'Pinhole z': ['MAXV', mPinZ, 'nopco', 'sxx', 'FI6_Signal', 0.25],
+        'Mono X Translation': ['MAXV', mMonoX, 'nopco', 'sxx', 'FI7_Signal', 0.2]}
 
     # create lists for drop-down menus
     fly_list = ['Sample Y', 'Sample Z', 'More']
