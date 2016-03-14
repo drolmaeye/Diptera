@@ -1726,6 +1726,7 @@ class DataLoad:
         else:
             pass
 
+
 class Overlay:
     def __init__(self, master, label):
         self.frame = Frame(master)
@@ -1879,6 +1880,7 @@ class Overlay:
             update_plot()
         else:
             showinfo('Empty Dataset', 'There is no data to grab!')
+
 
 class Staff:
     def __init__(self, master):
@@ -2107,6 +2109,7 @@ class DragHorizontalLines:
         DragHorizontalLines.lock = None
         self.hline.figure.canvas.draw()
 
+
 class DragVerticalLines:
     lock = None
 
@@ -2226,6 +2229,7 @@ def path_warn():
 def overwrite_warn():
     showwarning('Overwrite Warning',
                 'Scan no. and/or Image No. automatically incremented')
+
 
 def confirm_action():
     askyesno('Confirm action', 'Are you sure you want to proceed?')
@@ -2746,11 +2750,21 @@ elif config.stack_choice.get() == 'GPHL':
 
 elif config.stack_choice.get() == 'IDBLH':
     # create epics Motors, pco Devices, Struck, bnc
-    mX = Motor('16IDB:m39')
-    mY = Motor('16IDB:m40')
-    mZ = Motor('16IDB:m11')
-    mW = Motor('16IDB:m38')
+    mX = Motor('XPSLH:m1')
+    mY = Motor('XPSLH:m2')
+    mZ = Motor('XPSLH:m3')
+    mW = Motor('XPSLH:m4')
     mYbase = Motor('16IDB:m10')
+
+    mXpco = Device('XPSLH:m1', pco_args)
+    mYpco = Device('XPSLH:m2', pco_args)
+    mZpco = Device('XPSLH:m3', pco_args)
+    mWpco = Device('XPSLH:m4', pco_args)
+
+    mLgPinY = Motor('16IDB:m62')
+    mLgPinZ = Motor('16IDB:m63')
+    mBSY = Motor('16IDB:m67')
+    mBSZ = Motor('16IDB:m68')
 
     mcs = Struck('16IDB:SIS1:')
     softglue = Device('16IDB:softGlue:', softglue_args)
@@ -2760,12 +2774,26 @@ elif config.stack_choice.get() == 'IDBLH':
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
     stage_dict = {
-        'LH CEN Y': ['MAXV', mY, 'nopco', 'sxx', 'FI13_Signal', 0.3],
-        'LH SAM Z': ['MAXV', mZ, 'nopco', 'sxx', 'FI14_Signal', 0.5]}
+        'LH CEN X': ['XPS', mX, mXpco, 's01', 'FI1_Signal', 2.0],
+        'LH CEN Y': ['XPS', mY, mYpco, 's02', 'FI1_Signal', 2.0],
+        'LH SAM Z': ['XPS', mZ, mZpco, 's03', 'FI1_Signal', 2.0],
+        'LH OMEGA': ['XPS', mW, mWpco, 's04', 'FI1_Signal', 20.0],
+        'LH Pinhole Y': ['MAXV', mLgPinY, 'nopco', 'sxx', 'FI29_Signal', 0.3],
+        'LH Pinhole Z': ['MAXV', mLgPinZ, 'nopco', 'sxx', 'FI30_Signal', 0.3],
+        'LH Beamstop Y': ['MAXV', mBSY, 'nopco', 'sxx', 'FI33_Signal', 0.3],
+        'LH Beamstop Z': ['MAXV', mBSZ, 'nopco', 'sxx', 'FI34_Signal', 0.3]}
 
     # create lists for drop-down menus
-    fly_list = ['LH CEN Y', 'LH SAM Z']
-    step_list = ['LH CEN Y', 'LH SAM Z', 'Custom']
+    fly_list = ['LH CEN Y', 'LH SAM Z', 'More']
+    step_list = ['LH CEN Y', 'LH SAM Z', 'More', 'Custom']
+
+    more_list = [
+        'LH CEN X',
+        'LH OMEGA',
+        'LH Pinhole Y',
+        'LH Pinhole Z',
+        'LH Beamstop Y',
+        'LH Beamstop Z']
 
     counter_list = [
         'Beamstop diode',
