@@ -740,8 +740,8 @@ class ScanActions:
             sg_config.put('name2', 'xps_master', wait=True)
             sg_config.put('loadConfig2.PROC', 1, wait=True)
             # calculate number of 8 MHz ticks for half scan time pulse block
-            block_counts = scan.exp_time.get()*8000000/2
-            softglue.put('DnCntr-2_PRESET', block_counts, wait=True)
+            # ###block_counts = scan.exp_time.get()*8000000/2
+            # ###softglue.put('DnCntr-2_PRESET', block_counts, wait=True)
         softglue.put(sg_input, 'motor', wait=True)
         softglue.put('BUFFER-1_IN_Signal', '1!', wait=True)
         # enter for loop for npts flyscans
