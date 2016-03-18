@@ -2533,7 +2533,7 @@ root.title('Diptera')
 root.withdraw()
 config = ExpConfigure(root)
 # line below can be commented in/out and edited for autoconfig
-# config.stack_choice.set('TEST')
+config.stack_choice.set('TEST')
 if not config.stack_choice.get() == NONE:
     config.config_window.destroy()
 else:
