@@ -854,11 +854,12 @@ class ScanActions:
                 # try this for not responding, possibly remove
                 # ###framePlot.update()
             else:
-                showwarning('Pulse Count Error', message=('Stage failed to generate enough pulses \n'
-                            'Please try the following: \n'
-                            'Reduce count time, e.g., to 0.020 s\n'
-                            'Increase step size, e.g., greater than 0.001\n'
-                            'Ask you local contact for assistance'))
+                print 'moving on this time'
+                # ###showwarning('Pulse Count Error', message=('Stage failed to generate enough pulses \n'
+                # ###            'Please try the following: \n'
+                # ###            'Reduce count time, e.g., to 0.020 s\n'
+                # ###            'Increase step size, e.g., greater than 0.001\n'
+                # ###            'Ask you local contact for assistance'))
             mFly.VELO = perm_velo
             mFly.BDST = perm_bdst
             time.sleep(.25)
@@ -1508,7 +1509,7 @@ class Actions:
         # make and place widgets
         self.button_abort = Button(self.frame, text='Abort',
                                    bg='red', height=2, width=14,
-                                   font=bigfont, command=self.activate_abort, state=DISABLED)
+                                   font=bigfont, command=self.activate_abort)# , state=DISABLED)
         self.button_abort.grid(row=0, column=0, padx=8, pady=20)
         self.button_more = Button(self.frame, text='More', height=2, width=14,
                                   font=bigfont, command=self.more_less)
@@ -1523,8 +1524,10 @@ class Actions:
         self.quit_button.grid(row=0, column=3, padx=8, pady=20)
 
     def activate_abort(self):
-        pass
-        # self.abort.set(1)
+        print abort.get()
+        while abort.get() == 0:
+            scan.start_scan()
+            time.sleep(5)
 
     def more_less(self):
         # w = root.winfo_width()
