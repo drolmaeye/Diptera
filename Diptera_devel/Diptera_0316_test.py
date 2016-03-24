@@ -495,6 +495,10 @@ class ScanActions:
         self.button_fly_z = Button(self.frame, text='Fly z', bg='light blue',
                                    command=self.fly_z)
         self.button_fly_z.grid(row=0, column=4, padx=3)
+        self.button_traj = Button(self.frame, text='Traj', bg='light blue',
+                                  command=self.traj)
+        self.button_traj.grid(row=0, column=5, padx=3)
+
 
     def exp_time_validate(self, event):
         # value must be float larger than 0.008 (max frequency of PILATUS)
@@ -516,6 +520,32 @@ class ScanActions:
     def fly_z(self):
         fly_axis.axis.set(fly_list[1])
         self.start_scan()
+
+    def traj(self):
+        # double-check that npts and step size work together
+        fly_axis.npts_validate()
+        if not fly_axis.flag.get():
+            showwarning('Scan aborted',
+                        'Modify Fly axis parameters until you have a green light')
+            return
+        # define temporary EPICS motor devices, fly velocity, and scan endpoints
+        controller, mFly, mFlypco, channel, sg_input, v_max = stage_dict[fly_axis.axis.get()]
+        mFly_ipos = mFly.RBV
+        perm_velo = mFly.VELO
+        temp_velo = fly_axis.step_size.get()/self.exp_time.get()
+        abs_fly_min = mFly_ipos + fly_axis.rel_min.get()
+        abs_fly_max = mFly_ipos + fly_axis.rel_max.get()
+        fly_zero = abs_fly_min - temp_velo * mW.ACCL * 1.5
+        fly_final = abs_fly_max + temp_velo * mW.ACCL * 1.5
+
+
+
+
+
+
+
+
+
 
     def start_scan(self):
         t_zero = time.clock()
