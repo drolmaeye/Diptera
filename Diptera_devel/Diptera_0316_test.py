@@ -19,6 +19,8 @@ from scipy.optimize import curve_fit
 import fabio
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
+import ftplib
+import XPS_Q8_drivers
 
 
 # define classes
@@ -537,6 +539,29 @@ class ScanActions:
         abs_fly_max = mFly_ipos + fly_axis.rel_max.get()
         fly_zero = abs_fly_min - temp_velo * mW.ACCL * 1.5
         fly_final = abs_fly_max + temp_velo * mW.ACCL * 1.5
+        make_trajectory(zero=fly_zero, min=abs_fly_min, max=abs_fly_max, velo=temp_velo, motor=mFly)
+        mFly.move(fly_zero, wait=True)
+        time.sleep(0.1)
+        myxps = XPS_Q8_drivers.XPS()
+        socketId = myxps.TCP_ConnectToServer(xps_ip, 5001, 20)
+        myxps.MultipleAxesPVTPulseOutputSet(socketId, 'M', 2, 3, 0.020)
+        a = time.clock()
+        # myxps.TCLScriptExecute(socketId, 'history.tcl', 'fred', '0')
+        myxps.MultipleAxesPVTExecution(socketId, 'M', 'traj.trj', 1)
+        myxps.TCP_CloseSocket(socketId)
+        b = time.clock()
+        print b-a
+        while not mFly.get('DMOV'):
+            print "movin'"
+            time.sleep(0.001)
+        print mFly.RBV
+        time.sleep(0.25)
+        mFly.move(mFly_ipos)
+
+        # myxps.TCP_CloseSocket(socketId)
+
+
+
 
 
 
@@ -752,6 +777,14 @@ class ScanActions:
             softglue.put('DnCntr-1_PRESET', accl_steps, wait=True)
             softglue.put('DnCntr-2_PRESET', accl_plus_fly_steps, wait=True)
             softglue.put('DivByN-1_N', micro_steps, wait=True)
+        elif controller == 'XPS':
+            make_trajectory(zero=fly_zero, min=abs_fly_min, max=abs_fly_max, velo=temp_velo, motor=mFly)
+            myxps = XPS_Q8_drivers.XPS()
+            socketId = myxps.TCP_ConnectToServer(xps_ip, 5001, 20)
+            myxps.MultipleAxesPVTPulseOutputSet(socketId, 'M', 2, 3, self.exp_time.get())
+            # load softglue config
+            sg_config.put('name2', 'xps_master', wait=True)
+            sg_config.put('loadConfig2.PROC', 1, wait=True)
         else:
             # controller must be XPS (for now)
             mFlypco.put('PositionCompareMode', 1, wait=True)
@@ -833,7 +866,11 @@ class ScanActions:
                 detector.Acquire = 1
             # Final actions plus data collection move
             mcs.start()
-            mFly.move(fly_final, wait=True)
+            if controller == 'MAXV':
+                mFly.move(fly_final, wait=True)
+            else:
+                myxps.MultipleAxesPVTExecution(socketId, 'M', 'traj.trj', 1)
+                myxps.TCP_CloseSocket(socketId)
             if image.flag.get():
                 while detector.Acquire:
                     time.sleep(0.1)
@@ -2348,6 +2385,57 @@ def configure_softglue():
     softglue.put('BUFFER-1_OUT_Signal', 'reset')
 
 
+def make_trajectory(zero, min, max, velo, motor):
+    line_a = ['0.525', '0', '0', '0', '0', '0', '0', '0', '0']
+    line_b = ['0', '0', '0', '0', '0', '0', '0', '0', '0']
+    line_c = ['0.525', '0', '0', '0', '0', '0', '0', '0', '0']
+    if motor.get('DIR') == 0:
+        sign = 1
+    else:
+        sign = -1
+    delta_xac = sign*(min - zero)
+    delta_xb = sign*(max-min)
+    velo_ab = sign*(velo)
+    delta_tb = delta_xb/velo_ab
+    if motor == mX:
+        print 'x'
+        xi = 1
+        vi = 2
+    elif motor == mY:
+        print 'y'
+        xi = 3
+        vi = 4
+    elif motor == mZ:
+        print 'z'
+        xi = 5
+        vi = 6
+    else:
+        print 'w'
+        xi = 7
+        vi = 8
+    line_a[xi] = str(delta_xac)
+    line_a[vi] = str(velo_ab)
+    line_b[0] = str(delta_tb)
+    line_b[xi] = str(delta_xb)
+    line_b[vi] = str(velo_ab)
+    line_c[xi] = str(delta_xac)
+    line_a = ','.join(line_a)
+    line_b = ','.join(line_b)
+    line_c = ','.join(line_c)
+    complete_file = (line_a + '\n' + line_b + '\n' + line_c + '\n')
+    print complete_file
+    traj_file = open('traj.trj', 'w')
+    traj_file.write(complete_file)
+    traj_file.close()
+    session = ftplib.FTP(xps_ip, user='Administrator', passwd='Administrator')
+    session.cwd('Public/Trajectories/')
+    traj_file = open('traj.trj')
+    session.storlines('STOR traj.trj', traj_file)
+    traj_file.close()
+    session.quit()
+
+
+
 def update_plot(*args):
     # create a list for iteration
     array_list = [core, over1, over2, over3]
@@ -2667,6 +2755,7 @@ elif config.stack_choice.get() == 'GPHP':
     mYpco = Device('XPSGP:m2', pco_args)
     mZpco = Device('XPSGP:m3', pco_args)
     mWpco = Device('XPSGP:m4', pco_args)
+    xps_ip = '164.54.164.24'
 
     mHSlit = Motor('16IDB:m21')
     mVSlit = Motor('16IDB:m22')
@@ -2731,6 +2820,7 @@ elif config.stack_choice.get() == 'GPHL':
     mYbase = Motor('16IDB:m4')
 
     mWpco = Device('XPSGP:m5', pco_args)
+    xps_ip = '164.54.164.24'
 
     mHSlit = Motor('16IDB:m21')
     mVSlit = Motor('16IDB:m22')
@@ -2853,6 +2943,7 @@ elif config.stack_choice.get() == 'TEST':
     mYpco = Device('XPSTEST:m2', pco_args)
     mZpco = Device('XPSTEST:m3', pco_args)
     mWpco = Device('XPSTEST:m4', pco_args)
+    xps_ip = '164.54.164.24'
 
     mcs = Struck('16TEST1:SIS1:')
     softglue = Device('16TEST1:softGlue:', softglue_args)
