@@ -785,7 +785,7 @@ class ScanActions:
             sg_config.put('name2', 'xps_master', wait=True)
             sg_config.put('loadConfig2.PROC', 1, wait=True)
         else:
-            # controller must be XPS (for now)
+            # this is now skipped
             mFlypco.put('PositionCompareMode', 1, wait=True)
             mFlypco.put('PositionComparePulseWidth', 0, wait=True)
             mFlypco.put('PositionCompareSettlingTime', 3, wait=True)
@@ -2887,6 +2887,7 @@ elif config.stack_choice.get() == 'IDBLH':
     mYpco = Device('XPSLH:m2', pco_args)
     mZpco = Device('XPSLH:m3', pco_args)
     mWpco = Device('XPSLH:m4', pco_args)
+    xps_ip = '164.54.164.104'
 
     mLgPinY = Motor('16IDB:m62')
     mLgPinZ = Motor('16IDB:m63')
