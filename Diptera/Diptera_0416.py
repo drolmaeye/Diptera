@@ -497,9 +497,6 @@ class ScanActions:
         self.button_fly_z = Button(self.frame, text='Fly z', bg='light blue',
                                    command=self.fly_z)
         self.button_fly_z.grid(row=0, column=4, padx=3)
-        self.button_traj = Button(self.frame, text='Traj', bg='light blue',
-                                  command=self.traj)
-        self.button_traj.grid(row=0, column=5, padx=3)
 
     def exp_time_validate(self, event):
         # value must be float larger than 0.008 (max frequency of PILATUS)
@@ -521,55 +518,6 @@ class ScanActions:
     def fly_z(self):
         fly_axis.axis.set(fly_list[1])
         self.start_scan()
-
-    def traj(self):
-        # double-check that npts and step size work together
-        fly_axis.npts_validate()
-        if not fly_axis.flag.get():
-            showwarning('Scan aborted',
-                        'Modify Fly axis parameters until you have a green light')
-            return
-        # define temporary EPICS motor devices, fly velocity, and scan endpoints
-        controller, mFly, mFlypco, channel, sg_input, v_max = stage_dict[fly_axis.axis.get()]
-        mFly_ipos = mFly.RBV
-        perm_velo = mFly.VELO
-        temp_velo = fly_axis.step_size.get()/self.exp_time.get()
-        abs_fly_min = mFly_ipos + fly_axis.rel_min.get()
-        abs_fly_max = mFly_ipos + fly_axis.rel_max.get()
-        fly_zero = abs_fly_min - temp_velo * mW.ACCL * 1.5
-        fly_final = abs_fly_max + temp_velo * mW.ACCL * 1.5
-        make_trajectory(zero=fly_zero, min=abs_fly_min, max=abs_fly_max, velo=temp_velo, motor=mFly)
-        mFly.move(fly_zero, wait=True)
-        time.sleep(0.1)
-        myxps = XPS_Q8_drivers.XPS()
-        socketId = myxps.TCP_ConnectToServer(xps_ip, 5001, 20)
-        myxps.MultipleAxesPVTPulseOutputSet(socketId, 'M', 2, 3, 0.020)
-        a = time.clock()
-        # myxps.TCLScriptExecute(socketId, 'history.tcl', 'fred', '0')
-        myxps.MultipleAxesPVTExecution(socketId, 'M', 'traj.trj', 1)
-        myxps.TCP_CloseSocket(socketId)
-        b = time.clock()
-        print b-a
-        while not mFly.get('DMOV'):
-            print "movin'"
-            time.sleep(0.001)
-        print mFly.RBV
-        time.sleep(0.25)
-        mFly.move(mFly_ipos)
-
-        # myxps.TCP_CloseSocket(socketId)
-
-
-
-
-
-
-
-
-
-
-
-
 
     def start_scan(self):
         t_zero = time.clock()
@@ -767,45 +715,28 @@ class ScanActions:
         plt.gcf().canvas.draw()
         framePlot.update_idletasks()
         # set up and enable pco and softglue
-        sg_config.put('name1', 'clear_all', wait=True)
-        sg_config.put('loadConfig1.PROC', 1, wait=True)
+        # sg_config.put('name1', 'clear_all', wait=True)
+        # sg_config.put('loadConfig1.PROC', 1, wait=True)
+        softglue.put('BUFFER-1_IN_Signal', '1!', wait=True)
         if controller == 'MAXV':
             # load softglue config
             sg_config.put('name2', 'step_master', wait=True)
+            sg_config.put('name2', 'step_master', wait=True)
             sg_config.put('loadConfig2.PROC', 1, wait=True)
+            softglue.put('BUFFER-1_IN_Signal', '1!', wait=True)
+            # softglue.put('DnCntr-1_PRESET', accl_steps, wait=True)
             softglue.put('DnCntr-1_PRESET', accl_steps, wait=True)
-            softglue.put('DnCntr-2_PRESET', accl_plus_fly_steps, wait=True)
             softglue.put('DivByN-1_N', micro_steps, wait=True)
-        elif controller == 'XPS':
+        else:
+            # controller must be XPS
             make_trajectory(zero=fly_zero, min=abs_fly_min, max=abs_fly_max, velo=temp_velo, motor=mFly)
             myxps = XPS_Q8_drivers.XPS()
             socketId = myxps.TCP_ConnectToServer(xps_ip, 5001, 20)
             myxps.MultipleAxesPVTPulseOutputSet(socketId, 'M', 2, 3, self.exp_time.get())
             # load softglue config
             sg_config.put('name2', 'xps_master', wait=True)
-            sg_config.put('loadConfig2.PROC', 1, wait=True)
-        else:
-            # this is now skipped
-            mFlypco.put('PositionCompareMode', 1, wait=True)
-            mFlypco.put('PositionComparePulseWidth', 0, wait=True)
-            mFlypco.put('PositionCompareSettlingTime', 3, wait=True)
-            # smallest step below, real step size after endpoints
-            mFlypco.put('PositionCompareStepSize', 0.001, wait=True)
-            if mFlypco.PositionCompareMaxPosition <= abs_fly_min:
-                mFlypco.PositionCompareMaxPosition = abs_fly_max
-                mFlypco.PositionCompareMinPosition = abs_fly_min
-            else:
-                mFlypco.PositionCompareMinPosition = abs_fly_min
-                mFlypco.PositionCompareMaxPosition = abs_fly_max
-            mFlypco.PositionCompareStepSize = fly_axis.step_size.get()
-            # route PCO to softglue using 10-1
-            bnc.put(channel)
-            # load softglue config
             sg_config.put('name2', 'xps_master', wait=True)
             sg_config.put('loadConfig2.PROC', 1, wait=True)
-            # calculate number of 8 MHz ticks for half scan time pulse block
-            # ###block_counts = scan.exp_time.get()*8000000/2
-            # ###softglue.put('DnCntr-2_PRESET', block_counts, wait=True)
         softglue.put(sg_input, 'motor', wait=True)
         softglue.put('BUFFER-1_IN_Signal', '1!', wait=True)
         # enter for loop for npts flyscans
@@ -833,9 +764,6 @@ class ScanActions:
             mcs.put('OutputMode', 3, wait=True)
             mcs.put('OutputPolarity', 0, wait=True)
             mcs.put('LNEStretcherEnable', 0, wait=True)
-            mcs.put('LNEOutputPolarity', 1, wait=True)
-            mcs.put('LNEOutputDelay', 0, wait=True)
-            mcs.put('LNEOutputWidth', 1e-6, wait=True)
             mcs.NuseAll = fly_axis.npts.get() - 1
             # reset softglue for fresh counting
             softglue.put('BUFFER-1_IN_Signal', '1!', wait=True)
@@ -937,8 +865,6 @@ class ScanActions:
             detector.TriggerMode = 0
             detector.NumImages = 1
             image.flag.set(0)
-        if controller == 'XPS':
-            mFlypco.put('PositionCompareMode', 0, wait=True)
         softglue.put(sg_input, '')
         mFly.move(mFly_ipos, wait=True)
         mStep.move(mStep_ipos, wait=True)
@@ -2074,50 +2000,6 @@ class Staff:
         # hide window on startup
         self.popup.withdraw()
 
-    # method below was ONLY used for beam fraction as an entry
-    # but I don't like it so I am taking it out January 2016
-    # def find_width(self, *event):
-    #     staff.area_calc = 1
-    #     target = staff.pv_beamsize.get()
-    #     new_mid = staff.pv_x0.get()
-    #     new_min = new_mid - 0.008
-    #     new_max = new_mid + 0.008
-    #     step = 0.002
-    #     initial = staff.area / staff.pv_a.get()
-    #     if initial - target > 0:
-    #         direction = -1
-    #     else:
-    #         direction = 1
-    #     for i in range(100):
-    #         current = staff.area / staff.pv_a.get()
-    #         difference = current - target
-    #         if abs(difference) > 0.001:
-    #             if difference > 0 and direction == -1:
-    #                 direction = -1
-    #             elif difference < 0 and direction == 1:
-    #                 direction = 1
-    #             elif difference < 0 and direction == -1:
-    #                 step *= 0.4
-    #                 direction = 1
-    #             elif difference > 0 and direction == 1:
-    #                 step *= 0.4
-    #                 direction = -1
-    #             new_min -= step*direction
-    #             new_max += step*direction
-    #             hax.min_pos.set(new_min)
-    #             hax.max_pos.set(new_max)
-    #             beamsize_integral()
-    #         else:
-    #             if i:
-    #                 hax.min_pos.set('%.4f' % new_min)
-    #                 hax.mid_pos.set('%.4f' % new_mid)
-    #                 hax.max_pos.set('%.4f' % new_max)
-    #                 print i
-    #                 print difference
-    #                 update_plot()
-    #             staff.area_calc = 0
-    #             break
-
     def calc_mixes(self):
         wl = self.pv_wl.get()
         wr = self.pv_wr.get()
@@ -2337,51 +2219,6 @@ def beamsize_integral():
 
 def path_put(**kwargs):
     image.det_path.set(detector.get('FilePath_RBV', as_string=True))
-
-
-def configure_softglue():
-    # blank all input and label output17 correctly
-    softglue.put('FI1_Signal', '')
-    softglue.put('FI2_Signal', '')
-    softglue.put('FI3_Signal', '')
-    softglue.put('FI4_Signal', '')
-    softglue.put('FI5_Signal', '')
-    softglue.put('FI6_Signal', '')
-    softglue.put('FI7_Signal', '')
-    softglue.put('FI8_Signal', '')
-    softglue.put('FI9_Signal', '')
-    softglue.put('FI10_Signal', '')
-    softglue.put('FI11_Signal', '')
-    softglue.put('FI12_Signal', '')
-    softglue.put('FI13_Signal', '')
-    softglue.put('FI14_Signal', '')
-    softglue.put('FI15_Signal', '')
-    softglue.put('FI16_Signal', '')
-    softglue.put('FO17_Signal', 'pulse_out')
-    softglue.put('AND-1_IN1_Signal', 'gate')
-    softglue.put('AND-1_IN2_Signal', 'motor*')
-    softglue.put('AND-1_OUT_Signal', 'cv_pulse')
-    softglue.put('OR-1_IN1_Signal', 'start')
-    softglue.put('OR-1_IN2_Signal', 'big_step')
-    softglue.put('OR-1_OUT_Signal', 'pulse_out')
-    softglue.put('DnCntr-1_CLOCK_Signal', 'motor')
-    softglue.put('DnCntr-1_LOAD_Signal', 'reset')
-    softglue.put('DnCntr-1_OUT_Signal', 'start')
-    softglue.put('DivByN-1_ENABLE_Signal', 'gate')
-    softglue.put('DivByN-1_CLOCK_Signal', 'motor')
-    softglue.put('DivByN-1_RESET_Signal', 'reset')
-    softglue.put('DivByN-1_OUT_Signal', 'big_step')
-    softglue.put('DFF-1_CLOCK_Signal', 'start')
-    softglue.put('DFF-1_CLEAR_Signal', 'reset*')
-    softglue.put('DFF-1_OUT_Signal', 'gate')
-    softglue.put('UpCntr-1_CLOCK_Signal', 'motor')
-    softglue.put('UpCntr-1_CLEAR_Signal', 'reset')
-    softglue.put('UpCntr-2_CLOCK_Signal', 'cv_pulse')
-    softglue.put('UpCntr-2_CLEAR_Signal', 'reset')
-    softglue.put('UpCntr-3_CLOCK_Signal', 'pulse_out')
-    softglue.put('UpCntr-3_CLEAR_Signal', 'reset')
-    softglue.put('BUFFER-1_IN_Signal', '1!')
-    softglue.put('BUFFER-1_OUT_Signal', 'reset')
 
 
 def make_trajectory(zero, min, max, velo, motor):
@@ -2945,6 +2782,8 @@ elif config.stack_choice.get() == 'TEST':
     mWpco = Device('XPSTEST:m4', pco_args)
     xps_ip = '164.54.164.24'
 
+    mT = Motor('16TEST1:m9')
+
     mcs = Struck('16TEST1:SIS1:')
     softglue = Device('16TEST1:softGlue:', softglue_args)
     sg_config = Device('16TEST1:SGMenu:', sg_config_args)
@@ -2954,10 +2793,11 @@ elif config.stack_choice.get() == 'TEST':
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
     stage_dict = {
-        'XPS TEST X': ['XPS', mX, mXpco, 's01', 'FI2_Signal', 2.0],
-        'XPS TEST Y': ['XPS', mY, mYpco, 's02', 'FI2_Signal', 2.0],
-        'XPS TEST Z': ['XPS', mZ, mZpco, 's03', 'FI2_Signal', 2.0],
-        'XPS TEST W': ['XPS', mW, mWpco, 's04', 'FI2_Signal', 20.0]}
+        'XPS TEST X': ['XPS', mX, 'nopco', 's01', 'FI1_Signal', 2.0],
+        'XPS TEST Y': ['XPS', mY, 'nopco', 's02', 'FI1_Signal', 2.0],
+        'XPS TEST Z': ['XPS', mZ, 'nopco', 's03', 'FI1_Signal', 2.0],
+        'XPS TEST W': ['XPS', mW, 'nopco', 's04', 'FI1_Signal', 20.0],
+        'M9': ['MAXV', mT, 'nopco', 'sxx', 'FI9_Signal', 1.0]}
 
     # create lists for drop-down menus
     fly_list = ['XPS TEST Y', 'XPS TEST Z', 'More']
@@ -2965,7 +2805,8 @@ elif config.stack_choice.get() == 'TEST':
 
     more_list = [
         'XPS TEST X',
-        'XPS TEST W']
+        'XPS TEST W',
+        'M9']
 
     counter_list = [
         'Beamstop diode',
