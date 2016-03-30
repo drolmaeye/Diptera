@@ -848,12 +848,12 @@ class ScanActions:
                 # try this for not responding, possibly remove
                 # ###framePlot.update()
             else:
-                print 'moving on this time'
-                # ###showwarning('Pulse Count Error', message=('Stage failed to generate enough pulses \n'
-                # ###            'Please try the following: \n'
-                # ###            'Reduce count time, e.g., to 0.020 s\n'
-                # ###            'Increase step size, e.g., greater than 0.001\n'
-                # ###            'Ask you local contact for assistance'))
+                # print 'moving on this time'
+                showwarning('Pulse Count Error', message=('Stage failed to generate enough pulses \n'
+                            'Please try the following: \n'
+                            'Reduce count time, e.g., to 0.020 s\n'
+                            'Increase step size, e.g., greater than 0.001\n'
+                            'Ask you local contact for assistance'))
             mFly.VELO = perm_velo
             mFly.BDST = perm_bdst
             time.sleep(.25)
@@ -2234,19 +2234,19 @@ def make_trajectory(zero, min, max, velo, motor):
     velo_ab = sign*(velo)
     delta_tb = delta_xb/velo_ab
     if motor == mX:
-        print 'x'
+        # print 'x'
         xi = 1
         vi = 2
     elif motor == mY:
-        print 'y'
+        # print 'y'
         xi = 3
         vi = 4
     elif motor == mZ:
-        print 'z'
+        # print 'z'
         xi = 5
         vi = 6
     else:
-        print 'w'
+        # print 'w'
         xi = 7
         vi = 8
     line_a[xi] = str(delta_xac)
@@ -2259,7 +2259,7 @@ def make_trajectory(zero, min, max, velo, motor):
     line_b = ','.join(line_b)
     line_c = ','.join(line_c)
     complete_file = (line_a + '\n' + line_b + '\n' + line_c + '\n')
-    print complete_file
+    # print complete_file
     traj_file = open('traj.trj', 'w')
     traj_file.write(complete_file)
     traj_file.close()
