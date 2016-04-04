@@ -732,7 +732,6 @@ class ScanActions:
             make_trajectory(zero=fly_zero, min=abs_fly_min, max=abs_fly_max, velo=temp_velo, motor=mFly)
             myxps = XPS_Q8_drivers.XPS()
             socketId = myxps.TCP_ConnectToServer(xps_ip, 5001, 20)
-            myxps.MultipleAxesPVTPulseOutputSet(socketId, 'M', 2, 3, self.exp_time.get())
             # load softglue config
             sg_config.put('name2', 'xps_master', wait=True)
             sg_config.put('name2', 'xps_master', wait=True)
@@ -795,45 +794,10 @@ class ScanActions:
             mcs.start()
             if controller == 'MAXV':
                 mFly.move(fly_final, wait=True)
-                # ###update_plot()
-                # ###mFly.move(fly_final)
-                # ###print mFly.get('DMOV')
-                # ###total = mcs.NuseAll
-                # ###while not mFly.get('DMOV'):
-                # ###    # mcs.put('DoReadAll', 1)
-                # ###    TIM_ara = mcs.readmca(1)
-                # ###    FOE_ara = mcs.readmca(5)
-                # ###    REF_ara = mcs.readmca(4)
-                # ###    BSD_ara = mcs.readmca(6)
-                # ###    RMD_ara = mcs.readmca(3)
-                # ###    print TIM_ara
-                # ###    print FOE_ara
-                # ###    print REF_ara
-                # ###    print BSD_ara
-                # ###    print RMD_ara
-                # ###    t = np.size(TIM_ara)
-                # ###    f = np.size(FOE_ara)
-                # ###    r = np.size(REF_ara)
-                # ###    b = np.size(BSD_ara)
-                # ###    d = np.size(RMD_ara)
-                # ###    if total > max(t, f, r, b, d):
-                # ###        filled_t = np.append(TIM_ara, np.ones(total - t, np.int8))
-                # ###        filled_f = np.append(FOE_ara, np.ones(total - f, np.int8))
-                # ###        filled_r = np.append(REF_ara, np.ones(total - r, np.int8))
-                # ###        filled_b = np.append(BSD_ara, np.ones(total - b, np.int8))
-                # ###        filled_d = np.append(RMD_ara, np.ones(total - d, np.int8))
-                # ###        core.TIM[steps] = filled_t
-                # ###        core.FOE[steps] = filled_f
-                # ###        core.REF[steps] = filled_r
-                # ###        core.BSD[steps] = filled_b
-                # ###        core.RMD[steps] = filled_d
-                # ###        # plt.gcf().canvas.draw()
-                # ###    time.sleep(0.05)
-
-
             else:
+                myxps.MultipleAxesPVTPulseOutputSet(socketId, 'M', 2, 3, self.exp_time.get())
                 myxps.MultipleAxesPVTExecution(socketId, 'M', 'traj.trj', 1)
-                myxps.TCP_CloseSocket(socketId)
+                mFly.move(fly_final, wait=True)
             if image.flag.get():
                 while detector.Acquire:
                     time.sleep(0.1)
@@ -926,6 +890,7 @@ class ScanActions:
             data.current_slice.set(1)
             data.slice_flag.set(1)
             update_plot()
+        myxps.TCP_CloseSocket(socketId)
         self.button_start_flyscan.config(state=NORMAL, text='START SCAN')
         self.button_fly_y.config(state=NORMAL)
         self.button_fly_z.config(state=NORMAL)
@@ -1537,7 +1502,7 @@ class Actions:
         # make and place widgets
         self.button_abort = Button(self.frame, text='Abort',
                                    bg='red', height=2, width=14,
-                                   font=bigfont, command=self.activate_abort)# , state=DISABLED)
+                                   font=bigfont, command=self.activate_abort, state=DISABLED)
         self.button_abort.grid(row=0, column=0, padx=8, pady=20)
         self.button_more = Button(self.frame, text='More', height=2, width=14,
                                   font=bigfont, command=self.more_less)
@@ -2309,7 +2274,6 @@ def make_trajectory(zero, min, max, velo, motor):
 
 
 def update_plot(*args):
-    tzero = time.clock()
     # create a list for iteration
     array_list = [core, over1, over2, over3]
     for each in array_list:
@@ -2515,9 +2479,6 @@ def update_plot(*args):
             eh.yaxis.grid(True, which='minor')
             eh.xaxis.grid(True, which='minor')
     plt.gcf().canvas.draw()
-    tfinal = time.clock()
-    delta = tfinal - tzero
-    print delta
     print 'update done'
 
 
@@ -2767,7 +2728,7 @@ elif config.stack_choice.get() == 'IDBLH':
     stage_dict = {
         'LH CEN X': ['XPS', mX, 'FI1_Signal', 2.0],
         'LH CEN Y': ['XPS', mY, 'FI1_Signal', 2.0],
-        'LH SAM Z': ['XPS', mZ, 'FI1_Signal', 2.0],
+        'LH SAM Z': ['XPS', mZ, 'FI1_Signal', 1.0],
         'LH OMEGA': ['XPS', mW, 'FI1_Signal', 20.0],
         'LH Pinhole Y': ['MAXV', mLgPinY, 'FI29_Signal', 0.3],
         'LH Pinhole Z': ['MAXV', mLgPinZ, 'FI30_Signal', 0.3],
