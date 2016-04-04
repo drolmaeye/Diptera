@@ -795,20 +795,34 @@ class ScanActions:
             mcs.start()
             if controller == 'MAXV':
                 # ###mFly.move(fly_final, wait=True)
+                update_plot()
                 mFly.move(fly_final)
                 print mFly.get('DMOV')
+                total = mcs.NuseAll
                 while not mFly.get('DMOV'):
                     TIM_ara = mcs.readmca(1)
                     FOE_ara = mcs.readmca(5)
                     REF_ara = mcs.readmca(4)
                     BSD_ara = mcs.readmca(6)
                     RMD_ara = mcs.readmca(3)
-                    core.TIM[steps] = np.insert(TIM_ara
-                    core.FOE[steps] = FOE_ara
-                    core.REF[steps] = REF_ara
-                    core.BSD[steps] = BSD_ara
-                    core.RMD[steps] = RMD_ara
-                    update_plot()
+                    t = np.size(TIM_ara)
+                    f = np.size(TIM_ara)
+                    r = np.size(TIM_ara)
+                    b = np.size(TIM_ara)
+                    d = np.size(TIM_ara)
+                    if total > max(t, f, r, b, d):
+                        filled_t = np.append(TIM_ara, np.ones(total - t, np.int8))
+                        filled_f = np.append(FOE_ara, np.ones(total - f, np.int8))
+                        filled_r = np.append(REF_ara, np.ones(total - r, np.int8))
+                        filled_b = np.append(BSD_ara, np.ones(total - b, np.int8))
+                        filled_d = np.append(RMD_ara, np.ones(total - d, np.int8))
+                        core.TIM[steps] = filled_t
+                        core.FOE[steps] = filled_f
+                        core.REF[steps] = filled_r
+                        core.BSD[steps] = filled_b
+                        core.RMD[steps] = filled_d
+                        plt.gcf().canvas.draw()
+                    time.sleep(0.05)
 
 
             else:

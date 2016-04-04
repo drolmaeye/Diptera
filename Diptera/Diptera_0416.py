@@ -732,7 +732,6 @@ class ScanActions:
             make_trajectory(zero=fly_zero, min=abs_fly_min, max=abs_fly_max, velo=temp_velo, motor=mFly)
             myxps = XPS_Q8_drivers.XPS()
             socketId = myxps.TCP_ConnectToServer(xps_ip, 5001, 20)
-            myxps.MultipleAxesPVTPulseOutputSet(socketId, 'M', 2, 3, self.exp_time.get())
             # load softglue config
             sg_config.put('name2', 'xps_master', wait=True)
             sg_config.put('name2', 'xps_master', wait=True)
@@ -796,8 +795,9 @@ class ScanActions:
             if controller == 'MAXV':
                 mFly.move(fly_final, wait=True)
             else:
+                myxps.MultipleAxesPVTPulseOutputSet(socketId, 'M', 2, 3, self.exp_time.get())
                 myxps.MultipleAxesPVTExecution(socketId, 'M', 'traj.trj', 1)
-                myxps.TCP_CloseSocket(socketId)
+                mFly.move(fly_final, wait=True)
             if image.flag.get():
                 while detector.Acquire:
                     time.sleep(0.1)
@@ -890,6 +890,7 @@ class ScanActions:
             data.current_slice.set(1)
             data.slice_flag.set(1)
             update_plot()
+        myxps.TCP_CloseSocket(socketId)
         self.button_start_flyscan.config(state=NORMAL, text='START SCAN')
         self.button_fly_y.config(state=NORMAL)
         self.button_fly_z.config(state=NORMAL)
@@ -1501,7 +1502,7 @@ class Actions:
         # make and place widgets
         self.button_abort = Button(self.frame, text='Abort',
                                    bg='red', height=2, width=14,
-                                   font=bigfont, command=self.activate_abort)# , state=DISABLED)
+                                   font=bigfont, command=self.activate_abort, state=DISABLED)
         self.button_abort.grid(row=0, column=0, padx=8, pady=20)
         self.button_more = Button(self.frame, text='More', height=2, width=14,
                                   font=bigfont, command=self.more_less)
@@ -2490,7 +2491,7 @@ root.title('Diptera')
 root.withdraw()
 config = ExpConfigure(root)
 # line below can be commented in/out and edited for autoconfig
-config.stack_choice.set('TEST')
+# config.stack_choice.set('TEST')
 if not config.stack_choice.get() == NONE:
     config.config_window.destroy()
 else:
@@ -2727,7 +2728,7 @@ elif config.stack_choice.get() == 'IDBLH':
     stage_dict = {
         'LH CEN X': ['XPS', mX, 'FI1_Signal', 2.0],
         'LH CEN Y': ['XPS', mY, 'FI1_Signal', 2.0],
-        'LH SAM Z': ['XPS', mZ, 'FI1_Signal', 2.0],
+        'LH SAM Z': ['XPS', mZ, 'FI1_Signal', 1.0],
         'LH OMEGA': ['XPS', mW, 'FI1_Signal', 20.0],
         'LH Pinhole Y': ['MAXV', mLgPinY, 'FI29_Signal', 0.3],
         'LH Pinhole Z': ['MAXV', mLgPinZ, 'FI30_Signal', 0.3],
