@@ -734,7 +734,7 @@ class Annotate:
         self.ax = plt.gca()
         print self.ax
         # self.rect = Rectangle((0,0), 1, 1)
-        self.circ = plt.Circle((0,0), 1, alpha=0.1)
+        self.circ = plt.Circle((99,99), 1, alpha=0.3)
         self.x0 = None
         self.y0 = None
         self.x1 = None
