@@ -45,6 +45,8 @@ class CoreData:
         self.dhls = []
         self.dvls = []
         self.circle = []
+        self.dict_points = {}
+        self.points = []
         # define dimension and specify default
         self.dimension = 11
         # plot flag that cannot be turned off (for now), meaning primary data always plotted
@@ -776,6 +778,35 @@ class Annotate:
         # ###self.rect.set_height(self.y1 - self.y0)
         # ###self.rect.set_xy((self.x0, self.y0))
         self.ax.figure.canvas.draw()
+        # begin find indices inside circle
+        pa_zero = time.clock()
+        box_x_min = self.x0 - radius
+        box_x_max = self.x0 + radius
+        box_y_min = self.y0 - radius
+        box_y_max = self.y0 + radius
+        composite = None
+        for y_points in range(len(core.STP)):
+            if box_y_min < core.STP[y_points] < box_y_max:
+                for x_points in range(len(core.FLY)):
+                    if box_x_min < core.FLY[x_points] < box_x_max:
+                        distance = ((core.STP[y_points] - self.y0)**2 + (core.FLY[x_points] - self.x0)**2)**0.5
+                        if distance < radius:
+                            image_index = y_points*len(core.FLY) + x_points + 1
+                            trunk = '\\\HPCAT21\\Pilatus2\\500_500\\Data\\2016-1\\HPCAT\\Jesse\\'
+                            branch = 'mesh_' + str(image_index).zfill(3) + '.tif'
+                            image_path = trunk + branch
+                            temp_image = fabio.open(image_path)
+                            if not composite:
+                                print 'first'
+                                composite = temp_image
+                            else:
+                                composite.data += temp_image.data
+        if composite:
+            temp_name = 'composite.tif'
+            composite.write(temp_name)
+        pa_final = time.clock()
+
+
 
 
 def onclick(event):
@@ -794,7 +825,31 @@ def onclick(event):
     # start dioptas test
     # ###if image.dioptas_flag.get():
     # ###    image.send_to_dioptas()
+    # point test
+    if image_index in core.dict_points:
+        print 'already there, removing'
+        del core.dict_points[image_index]
+    else:
+        print 'we better add this!'
+        core.dict_points[image_index] = (core.FLY[xind], core.STP[yind])
+    core.points = core.dict_points.values()
+    update_plot()
     return hax.mid_pos.set('%.4f' % x_val), vax.mid_pos.set('%.4f' % y_val)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def invalid_entry():
@@ -1021,6 +1076,21 @@ def update_plot(*args):
             eh.set_xticks(core.FLY, minor=True)
             eh.yaxis.grid(True, which='minor')
             eh.xaxis.grid(True, which='minor')
+        if core.points:
+            for each in core.points:
+                plt.scatter(each[0], each[1])
+        # ###if not core.points_plot:
+        # ###    pass
+        # ###else:
+        # ###    core.points_plot.remove()
+        # ###x_values = []
+        # ###y_values = []
+        # ###for each in core.points.keys():
+        # ###    x_values.append(core.points[each][0])
+        # ###    y_values.append(core.points[each][1])
+        # ###print x_values
+        # ###print y_values
+        # ###core.points_plot = plt.scatter(x_values, y_values)
     plt.gcf().canvas.draw()
     print 'update done'
 
