@@ -99,7 +99,7 @@ class ExpConfigure:
         """
         stack = self.stack_choice.get()
         # valid list below created January 2016
-        valid_list = ['BMDHL', 'GPHP', 'GPHL', 'IDBLH']
+        valid_list = ['BMDHL', 'GPHP', 'GPHL', 'IDBLH', 'IDD']
         if stack not in valid_list:
             showerror('Under Development',
                       'Those stages are not yet available, program will exit')
@@ -816,6 +816,12 @@ class ScanActions:
                     REF_ara = mcs.readmca(2)
                     BSD_ara = mcs.readmca(6)
                     RMD_ara = mcs.readmca(3)
+                elif stack == 'IDD':
+                    TIM_ara = mcs.readmca(1)
+                    FOE_ara = mcs.readmca(1)
+                    REF_ara = mcs.readmca(5)
+                    BSD_ara = mcs.readmca(1)
+                    RMD_ara = mcs.readmca(6)
                 else:
                     # stack belongs to IDB
                     TIM_ara = mcs.readmca(1)
@@ -2788,6 +2794,48 @@ elif config.stack_choice.get() == 'TEST':
         'XPS TEST X',
         'XPS TEST W',
         'M9']
+
+    counter_list = [
+        'Beamstop diode',
+        'Removable diode',
+        'Hutch reference',
+        'FOE ion chamber',
+        '50 MHz clock']
+
+elif config.stack_choice.get() == 'IDD':
+    # create epics Motors, pco Devices, Struck, bnc
+    mX = Motor('16IDD:m29')
+    mY = Motor('16IDD:m19')
+    mZ = Motor('16IDD:m13')
+    mW = Motor('16IDD:m27')
+    mYbase = Motor('16IDD:m2')
+
+    mPinY = Motor('16IDD:m12')
+    mPinZ = Motor('16IDD:m11')
+
+    mcs = Struck('16IDD:SIS1:')
+    softglue = Device('16IDD:softGlue:', softglue_args)
+    sg_config = Device('16IDD:SGMenu:', sg_config_args)
+
+    # create dictionary for valid flyscan motors
+    # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
+    stage_dict = {
+        'Sample_X': ['MAXV', mX, 'FI1_Signal', 1.00],
+        'Sample_Y': ['MAXV', mY, 'FI2_Signal', 1.00],
+        'Sample_Z': ['MAXV', mZ, 'FI3_Signal', 0.90],
+        'Sample_Omega': ['MAXV', mW, 'FI4_Signal', 2.5],
+        'Pinhole_Y': ['MAXV', mPinY, 'FI5_Signal', 0.25],
+        'Pinhole_Z': ['MAXV', mPinZ, 'FI6_Signal', 0.25]}
+
+    # create lists for drop-down menus
+    fly_list = ['Sample_Y', 'Sample_Z', 'More']
+    step_list = ['Sample_Y', 'Sample_Z', 'More', 'Custom']
+
+    more_list = [
+        'Sample_X',
+        'Sample_Omega',
+        'Pinhole_Y',
+        'Pinhole_Z']
 
     counter_list = [
         'Beamstop diode',
