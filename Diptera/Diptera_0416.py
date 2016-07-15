@@ -2823,9 +2823,9 @@ elif config.stack_choice.get() == 'IDD':
         'Sample_X': ['MAXV', mX, 'FI1_Signal', 1.00],
         'Sample_Y': ['MAXV', mY, 'FI2_Signal', 1.00],
         'Sample_Z': ['MAXV', mZ, 'FI3_Signal', 0.90],
-        'Sample_Omega': ['MAXV', mW, 'FI4_Signal', 2.5],
-        'Pinhole_Y': ['MAXV', mPinY, 'FI5_Signal', 0.25],
-        'Pinhole_Z': ['MAXV', mPinZ, 'FI6_Signal', 0.25]}
+        'Sample_Omega': ['MAXV', mW, 'FI5_Signal', 2.5],
+        'Pinhole_Y': ['MAXV', mPinY, 'FI7_Signal', 0.25],
+        'Pinhole_Z': ['MAXV', mPinZ, 'FI8_Signal', 0.25]}
 
     # create lists for drop-down menus
     fly_list = ['Sample_Y', 'Sample_Z', 'More']
