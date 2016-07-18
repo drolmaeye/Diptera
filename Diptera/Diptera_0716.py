@@ -2259,6 +2259,7 @@ def make_trajectory(zero, min, max, velo, motor):
         xi = 5
         vi = 6
     else:
+        # must be w, pick correct one
         if config.stack_choice.get() == 'GPHL':
             xi = 9
             vi = 10
