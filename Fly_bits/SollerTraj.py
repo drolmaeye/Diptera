@@ -13,7 +13,7 @@ import numpy as np
 def make_soller_trajectory(theta_range, num_points, time_total, theta_naught):
 
     # r is offset
-    r = 35    
+    r = 35.75
     delta_time = time_total/(num_points-1)
     delta_theta = theta_range/(num_points - 1)
     v_theta = theta_range/time_total
@@ -27,8 +27,8 @@ def make_soller_trajectory(theta_range, num_points, time_total, theta_naught):
     vy_out_zero = r*cos(theta_naught*pi/180)*v_theta*pi/180
     delta_theta_zero = v_theta*0.375
     ramp_line = ['0.525', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']
-    ramp_line[11] = '%.5f' % delta_sx_zero
-    ramp_line[12] = '%.5f' % vx_out_zero
+    ramp_line[11] = '%.5f' % -delta_sx_zero
+    ramp_line[12] = '%.5f' % -vx_out_zero
     ramp_line[13] = '%.5f' % delta_sy_zero
     ramp_line[14] = '%.5f' % vy_out_zero
     ramp_line[15] = '%.5f' % delta_theta_zero
@@ -46,8 +46,8 @@ def make_soller_trajectory(theta_range, num_points, time_total, theta_naught):
         delta_sy = r*(sin(theta_f*pi/180)-sin(theta_i*pi/180))
         vx_out = -r*sin(theta_f*pi/180)*v_theta*pi/180
         vy_out = r*cos(theta_f*pi/180)*v_theta*pi/180
-        run_line[11] = '%.5f' % delta_sx
-        run_line[12] = '%.5f' % vx_out
+        run_line[11] = '%.5f' % -delta_sx
+        run_line[12] = '%.5f' % -vx_out
         run_line[13] = '%.5f' % delta_sy
         run_line[14] = '%.5f' % vy_out
         temp_line = ','.join(run_line)
@@ -57,7 +57,7 @@ def make_soller_trajectory(theta_range, num_points, time_total, theta_naught):
     delta_theta_final = delta_theta_zero
     delta_sx_final = r * (cos(theta_final * pi / 180) - cos(theta_max * pi / 180))
     delta_sy_final = r * (sin(theta_final * pi / 180) - sin(theta_max * pi / 180))
-    ramp_line[11] = '%.5f' % delta_sx_final
+    ramp_line[11] = '%.5f' % -delta_sx_final
     ramp_line[12] = '0.00000'
     ramp_line[13] = '%.5f' % delta_sy_final
     ramp_line[14] = '0.00000'
@@ -76,7 +76,7 @@ def make_soller_trajectory(theta_range, num_points, time_total, theta_naught):
     traj_file.close()
     session.quit()
 
-make_soller_trajectory(20.0, 101, 20.0, 170)
+make_soller_trajectory(-30.0, 301, 10.0, 15)
 
 
 

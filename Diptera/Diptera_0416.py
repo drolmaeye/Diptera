@@ -2229,9 +2229,14 @@ def path_put(**kwargs):
 
 
 def make_trajectory(zero, min, max, velo, motor):
-    line_a = ['0.525', '0', '0', '0', '0', '0', '0', '0', '0']
-    line_b = ['0', '0', '0', '0', '0', '0', '0', '0', '0']
-    line_c = ['0.525', '0', '0', '0', '0', '0', '0', '0', '0']
+    if config.stack_choice.get() == 'IDBLH':
+        line_a = ['0.525', '0', '0', '0', '0', '0', '0', '0', '0']
+        line_b = ['0', '0', '0', '0', '0', '0', '0', '0', '0']
+        line_c = ['0.525', '0', '0', '0', '0', '0', '0', '0', '0']
+    else:
+        line_a = ['0.525', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']
+        line_b = ['0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']
+        line_c = ['0.525', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']
     if motor.get('DIR') == 0:
         sign = 1
     else:
@@ -2276,7 +2281,6 @@ def make_trajectory(zero, min, max, velo, motor):
     session.storlines('STOR traj.trj', traj_file)
     traj_file.close()
     session.quit()
-
 
 
 def update_plot(*args):
