@@ -458,30 +458,30 @@ class DataLoad:
         self.display_index.grid(row=2, column=5)
 
     def load_data(self):
-        # ### disabled for testing convenience only!!!
-        # ###if not self.button_load.get():
-        # ###    old_data = data.current_file.get()
-        # ###    if not old_data == '':
-        # ###        old_dir = os.path.dirname(old_data)
-        # ###        if os.path.exists(old_dir):
-        # ###            data_file = askopenfilename(initialdir=old_dir)
-        # ###        else:
-        # ###            data_file = askopenfilename()
-        # ###    else:
-        # ###        data_file = askopenfilename()
-        # ###    try:
-        # ###        if os.path.isfile(data_file):
-        # ###            cdata = np.load(data_file)
-        # ###        else:
-        # ###            raise IOError
-        # ###    except IOError:
-        # ###        path_warn()
-        # ###        return
-        # ###else:
-        # ###    data_file = data.current_file.get()
-        # ###    cdata = np.load(data_file)
-        # ###    self.button_load.set(0)
-        data_file = '\\\ZEON\\epics\\saveData\\16idb\\2016-1\\fScan_1653.npz'
+         # disabled for testing convenience only!!!
+        if not self.button_load.get():
+            old_data = data.current_file.get()
+            if not old_data == '':
+                old_dir = os.path.dirname(old_data)
+                if os.path.exists(old_dir):
+                    data_file = askopenfilename(initialdir=old_dir)
+                else:
+                    data_file = askopenfilename()
+            else:
+                data_file = askopenfilename()
+            try:
+                if os.path.isfile(data_file):
+                    cdata = np.load(data_file)
+                else:
+                    raise IOError
+            except IOError:
+                path_warn()
+                return
+        else:
+            data_file = data.current_file.get()
+            cdata = np.load(data_file)
+            self.button_load.set(0)
+        #data_file = '\\\ZEON\\epics\\saveData\\16idb\\2016-1\\fScan_1653.npz'
         print data_file
         cdata = np.load(data_file)
         self.button_load.set(0)

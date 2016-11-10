@@ -63,6 +63,7 @@ class ExpConfigure:
 
         # working stack_list
         stack_list = [
+            ('BMB Laue', 'BMB'),
             ('BMD High Load', 'BMDHL'),
             ('IDB GP High Precision', 'GPHP'),
             ('IDB GP High Load', 'GPHL'),
@@ -2547,6 +2548,49 @@ if config.use_file.get():
     exec user_config.read()
     user_config.close()
 # hard-encoded configuration options
+elif config.stack_choice.get() == 'BMB':
+    # create epics Motors, pco Devices, Struck, bnc
+    mX = Motor('XPSBMB:m1')
+    mY = Motor('XPSBMB:m2')
+    mZ = Motor('XPSBMB:m3')
+    mW = Motor('XPSBMB:m4')
+    mYbase = Motor('XPSBMB:m5')
+
+    mPinY = Motor('16BMA:m30')
+    mPinZ = Motor('16BMA:m31')
+
+    mcs = Struck('16BMA:SIS1:')
+    softglue = Device('16BMA:softGlue:', softglue_args)
+    sg_config = Device('16BMA:SGMenu:', sg_config_args)
+    abort = PV('16BMA:Unidig1BoXXX')
+
+    # create dictionary for valid flyscan motors
+    # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
+    stage_dict = {
+        'Sample X': ['XPS', mX, 'FI1_Signal', 1.0],
+        'Sample Y': ['XPS', mY, 'FI1_Signal', 1.0],
+        'Sample Z': ['XPS', mZ, 'FI1_Signal', 1.0],
+        'Omega': ['XPS', mW, 'FI1_Signal', 10.0],
+        'Pinhole y': ['XPS', mPinY, 'Fxx_Signal', 0.25],
+        'Pinhole z': ['XPS', mPinZ, 'Fxx_Signal', 0.25]}
+
+    # create lists for drop-down menus
+    fly_list = ['Sample Y', 'Sample Z', 'More']
+    step_list = ['Sample Y', 'Sample Z', 'More', 'Custom']
+
+    more_list = [
+        'Sample X',
+        'Omega',
+        'Pinhole y',
+        'Pinhole z']
+
+    counter_list = [
+        'Beamstop diode',
+        'Removable diode',
+        'Hutch reference',
+        'FOE ion chamber',
+        '50 MHz clock']
+
 elif config.stack_choice.get() == 'BMDHL':
     # create epics Motors, pco Devices, Struck, bnc
     mX = Motor('16BMD:m38')
