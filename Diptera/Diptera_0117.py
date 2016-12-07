@@ -63,12 +63,13 @@ class ExpConfigure:
 
         # working stack_list
         stack_list = [
-            ('BMB Laue', 'BMB'),
+            ('BMB Laue Table', 'BMB'),
             ('BMD High Load', 'BMDHL'),
             ('IDB GP High Precision', 'GPHP'),
             ('IDB GP High Load', 'GPHL'),
             ('IDB Laser Heating Table', 'IDBLH'),
-            ('IDD Spectroscopy', 'IDD')]
+            ('IDD Spectroscopy', 'IDD'),]
+            # ###('Test', 'TEST')]
 
         # make radio buttons for stages using lists
         for stacks, designation in stack_list:
@@ -100,7 +101,7 @@ class ExpConfigure:
         """
         stack = self.stack_choice.get()
         # valid list below created January 2016
-        valid_list = ['BMDHL', 'GPHP', 'GPHL', 'IDBLH', 'IDD']
+        valid_list = ['BMB', 'BMDHL', 'GPHP', 'GPHL', 'IDBLH', 'IDD', 'TEST']
         if stack not in valid_list:
             showerror('Under Development',
                       'Those stages are not yet available, program will exit')
@@ -159,9 +160,9 @@ class ScanBox:
             self.axis.set(step_list[1])
             self.flag.set(0)
         self.rel_min.set('%.3f' % -.05)
-        self.step_size.set('%.4f' % .01)
+        self.step_size.set('%.4f' % .002)
         self.rel_max.set('%.3f' % .05)
-        self.npts.set(11)
+        self.npts.set(51)
         if label == 'Step axis':
             self.scan_directory = StringVar()
             self.scan_no = StringVar()
@@ -906,6 +907,117 @@ class ScanActions:
         print t_elapsed
 
 
+class Centering:
+    def __init__(self, master):
+        self.frame = Frame(master)
+        self.frame.pack()
+
+        # instance variable and set defaults
+        self.c_flag = IntVar()
+        self.delta_w = DoubleVar()
+        self.y_minus_pos = StringVar()
+        self.y_center_pos = StringVar()
+        self.y_plus_pos = StringVar()
+        self.delta_x = StringVar()
+        self.absolute_x = StringVar()
+        self.delta_y = StringVar()
+        self.absolute_y = StringVar()
+        self.delta_y_base = StringVar()
+        self.absolute_y_base = StringVar()
+        self.delta_w.set(2.0)
+
+        # set up trace on c_flag to verify buttons are disabled
+        self.c_flag.trace('w', self.disable_move_buttons)
+
+        # make and place column headings
+        self.head_center = Label(self.frame, text='CENTERING CONTROL')
+        self.head_center.grid(row=0, column=0, columnspan=2, pady=5, stick='w')
+        self.head_delta_w = Label(self.frame, text=u'\u0394 \u03c9')
+        self.head_delta_w.grid(row=0, column=2)
+        self.head_y_minus = Label(self.frame, text=u'y at \u03c9' + '-')
+        self.head_y_minus.grid(row=0, column=3)
+        self.head_y_center = Label(self.frame, text=u'y at \u03c9' + '0')
+        self.head_y_center.grid(row=0, column=4)
+        self.head_y_plus = Label(self.frame, text=u'y at \u03c9' + '+')
+        self.head_y_plus.grid(row=0, column=5)
+        self.head_delta_x = Label(self.frame, text='x correction')
+        self.head_delta_x.grid(row=0, column=6)
+        self.head_delta_y = Label(self.frame, text='y correction')
+        self.head_delta_y.grid(row=0, column=7)
+        self.head_absolute_x = Label(self.frame, text='Final target position ->')
+        self.head_absolute_x.grid(row=2, column=4, columnspan=2)
+
+        # make and place widgets
+        self.cbox_c_flag = Checkbutton(self.frame, text='Enable', variable=self.c_flag)
+        self.cbox_c_flag.grid(row=1, column=0, padx=5, pady=5)
+        self.entry_delta_w = Entry(self.frame, textvariable=self.delta_w, width=8)
+        self.entry_delta_w.grid(row=1, column=2, padx=5, pady=5)
+        self.label_y_minus = Label(self.frame, textvariable=self.y_minus_pos, relief=SUNKEN, width=8)
+        self.label_y_minus.grid(row=1, column=3, padx=5, pady=5)
+        self.label_y_center = Label(self.frame, textvariable=self.y_center_pos, relief=SUNKEN, width=8)
+        self.label_y_center.grid(row=1, column=4, padx=5, pady=5)
+        self.label_y_plus = Label(self.frame, textvariable=self.y_plus_pos, relief=SUNKEN, width=8)
+        self.label_y_plus.grid(row=1, column=5, padx=5, pady=5)
+        self.label_delta_x = Label(self.frame, textvariable=self.delta_x, relief=SUNKEN, width=8)
+        self.label_delta_x.grid(row=1, column=6, padx=5, pady=5)
+        self.label_delta_y = Label(self.frame, textvariable=self.delta_y, relief=SUNKEN, width=8)
+        self.label_delta_y.grid(row=1, column=7, padx=5, pady=5)
+        self.button_absolute_x = Button(self.frame, textvariable=self.absolute_x, command=self.move_x, width=7)
+        self.button_absolute_x.grid(row=2, column=6, padx=5, pady=5)
+        self.button_absolute_x.config(state=DISABLED)
+
+    def calc_deltas(self):
+        if not center.y_minus_pos.get() or not center.y_center_pos.get() or not center.y_plus_pos.get():
+            return
+        else:
+            center.button_absolute_x.config(state=NORMAL, background='green')
+            staff.button_move_all.config(state=NORMAL, background='green')
+            # ###start test code to account for omega angle error### #
+            ortho_factor = cos(radians(center.delta_w.get()))
+            dsx_plus = ortho_factor*(float(center.y_plus_pos.get()) - float(center.y_center_pos.get()))
+            dsx_minus = ortho_factor*(float(center.y_minus_pos.get()) - float(center.y_center_pos.get()))
+            # ###end test code### #
+            # ###dsx_plus = float(center.y_plus_pos.get()) - float(center.y_center_pos.get())
+            # ###dsx_minus = float(center.y_minus_pos.get()) - float(center.y_center_pos.get())
+            delta_x = (dsx_plus - dsx_minus)/2/(sin(radians(center.delta_w.get())))
+            delta_y = (dsx_plus + dsx_minus)/2/(cos(radians(center.delta_w.get()))-1)
+            delta_y_base = -delta_y
+            abs_x = mX.RBV + delta_x
+            abs_y = mY.RBV + delta_y
+            abs_base = mYbase.RBV - delta_y
+            center.delta_x.set('%.4f' % delta_x)
+            center.delta_y.set('%.4f' % delta_y)
+            center.delta_y_base.set('%.4f' % delta_y_base)
+            center.absolute_x.set('%.4f' % abs_x)
+            center.absolute_y.set('%.4f' % abs_y)
+            center.absolute_y_base.set('%.4f' % abs_base)
+
+    def move_x(self):
+        try:
+            abs_x = float(self.absolute_x.get())
+        except ValueError:
+            return
+        mX.move(abs_x, wait=True)
+        self.c_flag.set(0)
+
+    def move_all(self):
+        try:
+            abs_x = float(self.absolute_x.get())
+            abs_y = float(self.absolute_y.get())
+            abs_base = float(self.absolute_y_base.get())
+        except ValueError:
+            return
+        mX.move(abs_x, wait=True)
+        mY.move(abs_y, wait=True)
+        mYbase.move(abs_base, wait=True)
+        self.c_flag.set(0)
+
+    def disable_move_buttons(self, *args):
+        if not self.c_flag.get():
+            self.button_absolute_x.config(state=DISABLED, background='SystemButtonFace')
+            staff.button_move_all.config(state=DISABLED, background='SystemButtonFace')
+
+
 class Counters:
     def __init__(self, master):
         self.frame = Frame(master)
@@ -1075,231 +1187,6 @@ class Counters:
             update_plot()
         else:
             pass
-
-
-class Images:
-    def __init__(self, master):
-        self.frame = Frame(master)
-        self.frame.pack()
-
-        # define instance variables and set defaults
-        self.flag = IntVar()
-        self.det_path = StringVar()
-        self.user_path = StringVar()
-        self.sample_name = StringVar()
-        self.image_no = StringVar()
-        self.temp_file = StringVar()
-        self.dioptas_flag = IntVar()
-        self.grid_flag = IntVar()
-        self.flag.set(0)
-        self.user_path.set('P:\\2015-1\\HPCAT\\SXD_test\\')
-        self.sample_name.set('test')
-        self.image_no.set('001')
-
-        # make column headings
-        self.head_images = Label(self.frame, text='IMAGE CONTROL')
-        self.head_images.grid(row=0, column=0, columnspan=2, pady=5, sticky='w')
-
-        # make and place widgets
-        self.check_image_enable = Checkbutton(self.frame, text='Enable', variable=self.flag, state=DISABLED)
-        self.check_image_enable.grid(row=1, rowspan=2, column=0, columnspan=2)
-        self.label_det_path = Label(self.frame, text='Detector path')
-        self.label_det_path.grid(row=0, column=2, padx=5, pady=5)
-        self.display_det_path = Label(self.frame, textvariable=self.det_path,
-                                      width=40, relief=SUNKEN, anchor='w')
-        self.display_det_path.grid(row=0, column=3, columnspan=3, pady=5)
-        self.label_user_path = Label(self.frame, text='User directory')
-        self.label_user_path.grid(row=1, column=2, padx=5, pady=5)
-        self.entry_user_path = Entry(self.frame, textvariable=self.user_path,
-                                     width=46)
-        self.entry_user_path.grid(row=1, column=3, columnspan=3, pady=5)
-        self.entry_user_path.bind('<FocusOut>', self.user_path_validation)
-        self.entry_user_path.bind('<Return>', self.user_path_validation)
-        self.label_sample_name = Label(self.frame, text='Sample name')
-        self.label_sample_name.grid(row=2, column=2, padx=5, pady=5)
-        self.entry_sample_name = Entry(self.frame, textvariable=self.sample_name,
-                                       width=35)
-        self.entry_sample_name.grid(row=2, column=3, columnspan=2, pady=5)
-
-        self.label_image_no = Label(self.frame, text='Image No.')
-        self.label_image_no.grid(row=2, column=5, pady=5)
-        self.entry_image_no = Entry(self.frame, textvariable=self.image_no,
-                                    width=7)
-        self.entry_image_no.grid(row=2, column=6, sticky='w', padx=5, pady=5)
-        self.entry_image_no.bind('<FocusOut>', self.image_no_validation)
-        self.entry_image_no.bind('<Return>', self.image_no_validation)
-        self.button_path_select = Button(self.frame, text='Browse',
-                                         command=self.choose_directory)
-        self.button_path_select.grid(row=1, column=6, padx=5)
-        self.button_initialize = Button(self.frame, text='Initialize', command=self.initialize)
-        self.button_initialize.grid(row=3, column=0)
-        self.cbox_activate_dioptas = Checkbutton(self.frame, text='Enable Dioptas', variable=self.dioptas_flag)
-        self.cbox_activate_dioptas.grid(row=3, column=3, padx=5, pady=5)
-
-    def initialize(self):
-        self.check_image_enable.configure(state=NORMAL)
-        global detector
-        detector = Device('HP1M-PIL1:cam1:', detector_args)
-        detector.add_callback('FilePath_RBV', callback=path_put)
-        path_put()
-
-    def choose_directory(self):
-        user_dir = askdirectory(title='Select a user directory')
-        if user_dir and os.path.exists(user_dir):
-            win_path = os.path.normpath(user_dir)
-            return self.user_path.set(win_path + '\\')
-        else:
-            path_warn()
-
-    def user_path_validation(self, event):
-        val = self.user_path.get()
-        if not (os.path.exists(val)):
-            path_warn()
-            return
-        if val.endswith('\\'):
-            pass
-        else:
-            self.user_path.set(val + '\\')
-
-    def image_no_validation(self, *event):
-        try:
-            val = self.image_no.get()
-            int(val)
-            self.image_no.set(val.zfill(3))
-        except ValueError:
-            self.image_no.set('001')
-            invalid_entry()
-
-    def send_to_dioptas(self):
-        current_directory = self.user_path.get()
-        while not os.path.exists(current_directory):
-            self.choose_directory()
-            current_directory = self.user_path.get()
-        os.chdir(current_directory)
-        filename = self.sample_name.get() + '_' + str(data.index.get()).zfill(3) + '.tif'
-        full_filename = current_directory + filename
-        if not os.path.isfile(full_filename):
-            return
-        if not self.temp_file.get() == '':
-            old_temp = current_directory + self.temp_file.get()
-            if os.path.isfile(old_temp):
-                os.remove(old_temp)
-        temp_image = fabio.open(filename=filename)
-        temp_name = 'temp' + filename
-        self.temp_file.set(temp_name)
-        time.sleep(.5)
-        temp_image.write(temp_name)
-
-
-class Centering:
-    def __init__(self, master):
-        self.frame = Frame(master)
-        self.frame.pack()
-
-        # instance variable and set defaults
-        self.c_flag = IntVar()
-        self.delta_w = DoubleVar()
-        self.y_minus_pos = StringVar()
-        self.y_center_pos = StringVar()
-        self.y_plus_pos = StringVar()
-        self.delta_x = StringVar()
-        self.absolute_x = StringVar()
-        self.delta_y = StringVar()
-        self.absolute_y = StringVar()
-        self.delta_y_base = StringVar()
-        self.absolute_y_base = StringVar()
-        self.delta_w.set(2.0)
-
-        # set up trace on c_flag to verify buttons are disabled
-        self.c_flag.trace('w', self.disable_move_buttons)
-
-        # make and place column headings
-        self.head_center = Label(self.frame, text='CENTERING CONTROL')
-        self.head_center.grid(row=0, column=0, columnspan=2, pady=5, stick='w')
-        self.head_delta_w = Label(self.frame, text=u'\u0394 \u03c9')
-        self.head_delta_w.grid(row=0, column=2)
-        self.head_y_minus = Label(self.frame, text=u'y at \u03c9' + '-')
-        self.head_y_minus.grid(row=0, column=3)
-        self.head_y_center = Label(self.frame, text=u'y at \u03c9' + '0')
-        self.head_y_center.grid(row=0, column=4)
-        self.head_y_plus = Label(self.frame, text=u'y at \u03c9' + '+')
-        self.head_y_plus.grid(row=0, column=5)
-        self.head_delta_x = Label(self.frame, text='x correction')
-        self.head_delta_x.grid(row=0, column=6)
-        self.head_delta_y = Label(self.frame, text='y correction')
-        self.head_delta_y.grid(row=0, column=7)
-        self.head_absolute_x = Label(self.frame, text='Final target position ->')
-        self.head_absolute_x.grid(row=2, column=4, columnspan=2)
-
-        # make and place widgets
-        self.cbox_c_flag = Checkbutton(self.frame, text='Enable', variable=self.c_flag)
-        self.cbox_c_flag.grid(row=1, column=0, padx=5, pady=5)
-        self.entry_delta_w = Entry(self.frame, textvariable=self.delta_w, width=8)
-        self.entry_delta_w.grid(row=1, column=2, padx=5, pady=5)
-        self.label_y_minus = Label(self.frame, textvariable=self.y_minus_pos, relief=SUNKEN, width=8)
-        self.label_y_minus.grid(row=1, column=3, padx=5, pady=5)
-        self.label_y_center = Label(self.frame, textvariable=self.y_center_pos, relief=SUNKEN, width=8)
-        self.label_y_center.grid(row=1, column=4, padx=5, pady=5)
-        self.label_y_plus = Label(self.frame, textvariable=self.y_plus_pos, relief=SUNKEN, width=8)
-        self.label_y_plus.grid(row=1, column=5, padx=5, pady=5)
-        self.label_delta_x = Label(self.frame, textvariable=self.delta_x, relief=SUNKEN, width=8)
-        self.label_delta_x.grid(row=1, column=6, padx=5, pady=5)
-        self.label_delta_y = Label(self.frame, textvariable=self.delta_y, relief=SUNKEN, width=8)
-        self.label_delta_y.grid(row=1, column=7, padx=5, pady=5)
-        self.button_absolute_x = Button(self.frame, textvariable=self.absolute_x, command=self.move_x, width=7)
-        self.button_absolute_x.grid(row=2, column=6, padx=5, pady=5)
-        self.button_absolute_x.config(state=DISABLED)
-
-    def calc_deltas(self):
-        if not center.y_minus_pos.get() or not center.y_center_pos.get() or not center.y_plus_pos.get():
-            return
-        else:
-            center.button_absolute_x.config(state=NORMAL, background='green')
-            staff.button_move_all.config(state=NORMAL, background='green')
-            # ###start test code to account for omega angle error### #
-            ortho_factor = cos(radians(center.delta_w.get()))
-            dsx_plus = ortho_factor*(float(center.y_plus_pos.get()) - float(center.y_center_pos.get()))
-            dsx_minus = ortho_factor*(float(center.y_minus_pos.get()) - float(center.y_center_pos.get()))
-            # ###end test code### #
-            # ###dsx_plus = float(center.y_plus_pos.get()) - float(center.y_center_pos.get())
-            # ###dsx_minus = float(center.y_minus_pos.get()) - float(center.y_center_pos.get())
-            delta_x = (dsx_plus - dsx_minus)/2/(sin(radians(center.delta_w.get())))
-            delta_y = (dsx_plus + dsx_minus)/2/(cos(radians(center.delta_w.get()))-1)
-            delta_y_base = -delta_y
-            abs_x = mX.RBV + delta_x
-            abs_y = mY.RBV + delta_y
-            abs_base = mYbase.RBV - delta_y
-            center.delta_x.set('%.4f' % delta_x)
-            center.delta_y.set('%.4f' % delta_y)
-            center.delta_y_base.set('%.4f' % delta_y_base)
-            center.absolute_x.set('%.4f' % abs_x)
-            center.absolute_y.set('%.4f' % abs_y)
-            center.absolute_y_base.set('%.4f' % abs_base)
-
-    def move_x(self):
-        try:
-            abs_x = float(self.absolute_x.get())
-        except ValueError:
-            return
-        mX.move(abs_x, wait=True)
-        self.c_flag.set(0)
-
-    def move_all(self):
-        try:
-            abs_x = float(self.absolute_x.get())
-            abs_y = float(self.absolute_y.get())
-            abs_base = float(self.absolute_y_base.get())
-        except ValueError:
-            return
-        mX.move(abs_x, wait=True)
-        mY.move(abs_y, wait=True)
-        mYbase.move(abs_base, wait=True)
-        self.c_flag.set(0)
-
-    def disable_move_buttons(self, *args):
-        if not self.c_flag.get():
-            self.button_absolute_x.config(state=DISABLED, background='SystemButtonFace')
-            staff.button_move_all.config(state=DISABLED, background='SystemButtonFace')
 
 
 class Position:
@@ -1488,73 +1375,6 @@ class Position:
                 return
 
 
-class Actions:
-    """
-    Big buttons that initiate data collection
-    """
-
-    def __init__(self, master):
-        """
-        :param master: frame for inserting widgets
-        """
-        self.frame = Frame(master, padx=10, pady=5)
-        self.frame.pack()
-
-        # define variables
-        # ###self.abort = IntVar()
-        # ###self.abort.set(0)
-
-        # make big font
-        bigfont = tkFont.Font(size=10, weight='bold')
-
-        # make and place widgets
-        self.button_abort = Button(self.frame, text='Abort',
-                                   bg='red', height=2, width=14,
-                                   font=bigfont, command=self.activate_abort, state=DISABLED)
-        self.button_abort.grid(row=0, column=0, padx=8, pady=20)
-        self.button_more = Button(self.frame, text='More', height=2, width=14,
-                                  font=bigfont, command=self.more_less)
-        self.button_more.grid(row=0, column=1, padx=8, pady=20)
-        self.button_staff = Button(self.frame,
-                                   text='Alignment',
-                                   height=2, width=14, font=bigfont,
-                                   command=self.open_staff)
-        self.button_staff.grid(row=0, column=2, padx=8, pady=20)
-        self.quit_button = Button(self.frame, text='Quit', height=2, width=14,
-                                  font=bigfont, command=close_quit)
-        self.quit_button.grid(row=0, column=3, padx=8, pady=20)
-
-    def activate_abort(self):
-        print abort.get()
-        while abort.get() == 0:
-            scan.start_scan()
-            time.sleep(5)
-
-    def more_less(self):
-        # w = root.winfo_width()
-        w = 1351
-        h = root.winfo_height()
-        x = root.winfo_x()
-        y = root.winfo_y()
-        # print w, h, x, y
-        if h > 800:
-            h = 712
-            image.flag.set(0)
-            over1.plot_flag.set(0)
-            over2.plot_flag.set(0)
-            over3.plot_flag.set(0)
-            action.button_more.configure(text='More')
-            if data.current_file.get():
-                update_plot()
-        else:
-            h = 871
-            action.button_more.configure(text='Less')
-        root.geometry('%dx%d+%d+%d' % (w, h, x, y))
-
-    def open_staff(self):
-        staff.popup.deiconify()
-
-
 class DataLoad:
     def __init__(self, master):
         self.frame = Frame(master)
@@ -1734,6 +1554,62 @@ class DataLoad:
             pass
 
 
+class Actions:
+    """
+    Big buttons that initiate data collection
+    """
+
+    def __init__(self, master):
+        """
+        :param master: frame for inserting widgets
+        """
+        self.frame = Frame(master, padx=10, pady=5)
+        self.frame.pack()
+
+        # define variables
+        # ###self.abort = IntVar()
+        # ###self.abort.set(0)
+
+        # make big font
+        bigfont = tkFont.Font(size=10, weight='bold')
+
+        # make and place widgets
+        self.button_abort = Button(self.frame, text='Overlays', height=2, width=14,
+                                   font=bigfont, command=self.open_overlays)
+        self.button_abort.grid(row=0, column=0, padx=8, pady=20)
+        self.button_more = Button(self.frame, text='Imaging', height=2, width=14,
+                                  font=bigfont, command=self.open_imaging)
+        self.button_more.grid(row=0, column=1, padx=8, pady=20)
+        self.button_staff = Button(self.frame,
+                                   text='Alignment',
+                                   height=2, width=14, font=bigfont,
+                                   command=self.open_staff)
+        self.button_staff.grid(row=0, column=2, padx=8, pady=20)
+        self.quit_button = Button(self.frame, text='Quit', height=2, width=14,
+                                  font=bigfont, command=close_quit)
+        self.quit_button.grid(row=0, column=3, padx=8, pady=20)
+
+    def open_overlays(self):
+        alloverlays.popup.deiconify()
+
+    def open_imaging(self):
+        image.popup.deiconify()
+
+    def open_staff(self):
+        staff.popup.deiconify()
+
+
+class OverlayWindow:
+    def __init__(self, master):
+        self.popup = Toplevel(master)
+        self.popup.title('Overlay Plots')
+        self.frame = Frame(self.popup, width=676, height=158, bd=5, relief=RIDGE, padx=10, pady=5)
+        self.frame.pack()
+
+        # hide window on startup
+        self.popup.withdraw()
+
+
 class Overlay:
     def __init__(self, master, label):
         self.frame = Frame(master)
@@ -1887,6 +1763,125 @@ class Overlay:
             update_plot()
         else:
             showinfo('Empty Dataset', 'There is no data to grab!')
+
+
+class Images:
+    def __init__(self, master):
+        self.popup = Toplevel(master)
+        self.popup.title('X-ray Imaging Tools')
+        self.frame = Frame(self.popup, width=676, height=158, bd=5, relief=RIDGE, padx=10, pady=5)
+        self.frame.pack()
+
+        # define instance variables and set defaults
+        self.flag = IntVar()
+        self.det_path = StringVar()
+        self.user_path = StringVar()
+        self.sample_name = StringVar()
+        self.image_no = StringVar()
+        self.temp_file = StringVar()
+        self.dioptas_flag = IntVar()
+        self.grid_flag = IntVar()
+        self.flag.set(0)
+        self.user_path.set('P:\\2015-1\\HPCAT\\SXD_test\\')
+        self.sample_name.set('test')
+        self.image_no.set('001')
+
+        # make column headings
+        self.head_images = Label(self.frame, text='IMAGE CONTROL')
+        self.head_images.grid(row=0, column=0, columnspan=2, pady=5, sticky='w')
+
+        # make and place widgets
+        self.check_image_enable = Checkbutton(self.frame, text='Enable', variable=self.flag, state=DISABLED)
+        self.check_image_enable.grid(row=1, rowspan=2, column=0, columnspan=2)
+        self.label_det_path = Label(self.frame, text='Detector path')
+        self.label_det_path.grid(row=0, column=2, padx=5, pady=5)
+        self.display_det_path = Label(self.frame, textvariable=self.det_path,
+                                      width=40, relief=SUNKEN, anchor='w')
+        self.display_det_path.grid(row=0, column=3, columnspan=3, pady=5)
+        self.label_user_path = Label(self.frame, text='User directory')
+        self.label_user_path.grid(row=1, column=2, padx=5, pady=5)
+        self.entry_user_path = Entry(self.frame, textvariable=self.user_path,
+                                     width=46)
+        self.entry_user_path.grid(row=1, column=3, columnspan=3, pady=5)
+        self.entry_user_path.bind('<FocusOut>', self.user_path_validation)
+        self.entry_user_path.bind('<Return>', self.user_path_validation)
+        self.label_sample_name = Label(self.frame, text='Sample name')
+        self.label_sample_name.grid(row=2, column=2, padx=5, pady=5)
+        self.entry_sample_name = Entry(self.frame, textvariable=self.sample_name,
+                                       width=35)
+        self.entry_sample_name.grid(row=2, column=3, columnspan=2, pady=5)
+
+        self.label_image_no = Label(self.frame, text='Image No.')
+        self.label_image_no.grid(row=2, column=5, pady=5)
+        self.entry_image_no = Entry(self.frame, textvariable=self.image_no,
+                                    width=7)
+        self.entry_image_no.grid(row=2, column=6, sticky='w', padx=5, pady=5)
+        self.entry_image_no.bind('<FocusOut>', self.image_no_validation)
+        self.entry_image_no.bind('<Return>', self.image_no_validation)
+        self.button_path_select = Button(self.frame, text='Browse',
+                                         command=self.choose_directory)
+        self.button_path_select.grid(row=1, column=6, padx=5)
+        self.button_initialize = Button(self.frame, text='Initialize', command=self.initialize)
+        self.button_initialize.grid(row=3, column=0)
+        self.cbox_activate_dioptas = Checkbutton(self.frame, text='Enable Dioptas', variable=self.dioptas_flag)
+        self.cbox_activate_dioptas.grid(row=3, column=3, padx=5, pady=5)
+
+        # hide window on startup
+        self.popup.withdraw()
+
+    def initialize(self):
+        self.check_image_enable.configure(state=NORMAL)
+        global detector
+        detector = Device('HP1M-PIL1:cam1:', detector_args)
+        detector.add_callback('FilePath_RBV', callback=path_put)
+        path_put()
+
+    def choose_directory(self):
+        user_dir = askdirectory(title='Select a user directory')
+        if user_dir and os.path.exists(user_dir):
+            win_path = os.path.normpath(user_dir)
+            return self.user_path.set(win_path + '\\')
+        else:
+            path_warn()
+
+    def user_path_validation(self, event):
+        val = self.user_path.get()
+        if not (os.path.exists(val)):
+            path_warn()
+            return
+        if val.endswith('\\'):
+            pass
+        else:
+            self.user_path.set(val + '\\')
+
+    def image_no_validation(self, *event):
+        try:
+            val = self.image_no.get()
+            int(val)
+            self.image_no.set(val.zfill(3))
+        except ValueError:
+            self.image_no.set('001')
+            invalid_entry()
+
+    def send_to_dioptas(self):
+        current_directory = self.user_path.get()
+        while not os.path.exists(current_directory):
+            self.choose_directory()
+            current_directory = self.user_path.get()
+        os.chdir(current_directory)
+        filename = self.sample_name.get() + '_' + str(data.index.get()).zfill(3) + '.tif'
+        full_filename = current_directory + filename
+        if not os.path.isfile(full_filename):
+            return
+        if not self.temp_file.get() == '':
+            old_temp = current_directory + self.temp_file.get()
+            if os.path.isfile(old_temp):
+                os.remove(old_temp)
+        temp_image = fabio.open(filename=filename)
+        temp_name = 'temp' + filename
+        self.temp_file.set(temp_name)
+        time.sleep(.5)
+        temp_image.write(temp_name)
 
 
 class Staff:
@@ -2206,8 +2201,23 @@ def close_quit():
     root.quit()
 
 
-def hide_window():
+def hide_staff():
     staff.popup.withdraw()
+    staff.focus_flag.set(0)
+
+
+def hide_image():
+    image.popup.withdraw()
+    image.flag.set(0)
+
+
+def hide_alloverlays():
+    alloverlays.popup.withdraw()
+    over1.plot_flag.set(0)
+    over2.plot_flag.set(0)
+    over3.plot_flag.set(0)
+    if data.current_file.get():
+        update_plot()
 
 
 def piecewise_split_pv(x, a, x0, mul, mur, wl, wr):
@@ -2507,7 +2517,7 @@ root.title('Diptera')
 root.withdraw()
 config = ExpConfigure(root)
 # line below can be commented in/out and edited for autoconfig
-# config.stack_choice.set('TEST')
+config.stack_choice.set('TEST')
 if not config.stack_choice.get() == NONE:
     config.config_window.destroy()
 else:
@@ -2549,20 +2559,26 @@ if config.use_file.get():
     user_config.close()
 # hard-encoded configuration options
 elif config.stack_choice.get() == 'BMB':
-    # create epics Motors, pco Devices, Struck, bnc
+    # create objects including epics Motors, Struck, etc
+    # define 5-motor sample stack
     mX = Motor('XPSBMB:m1')
     mY = Motor('XPSBMB:m2')
     mZ = Motor('XPSBMB:m3')
     mW = Motor('XPSBMB:m4')
     mYbase = Motor('XPSBMB:m5')
 
+    # define xps ip (if needed)
+    xps_ip = '164.54.164.117'
+
+    # define any additional flyscan motors
     mPinY = Motor('16BMA:m30')
     mPinZ = Motor('16BMA:m31')
 
+    # define struck, softGlue, SG_Config, and abort PV
     mcs = Struck('16BMA:SIS1:')
     softglue = Device('16BMA:softGlue:', softglue_args)
     sg_config = Device('16BMA:SGMenu:', sg_config_args)
-    abort = PV('16BMA:Unidig1BoXXX')
+    abort = PV('16BMA:Unidig1Bo1')
 
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
@@ -2571,19 +2587,21 @@ elif config.stack_choice.get() == 'BMB':
         'Sample Y': ['XPS', mY, 'FI1_Signal', 1.0],
         'Sample Z': ['XPS', mZ, 'FI1_Signal', 1.0],
         'Omega': ['XPS', mW, 'FI1_Signal', 10.0],
-        'Pinhole y': ['XPS', mPinY, 'Fxx_Signal', 0.25],
-        'Pinhole z': ['XPS', mPinZ, 'Fxx_Signal', 0.25]}
+        'Pinhole y': ['MAXV', mPinY, 'F7_Signal', 0.25],
+        'Pinhole z': ['MAXV', mPinZ, 'F8_Signal', 0.25]}
 
     # create lists for drop-down menus
     fly_list = ['Sample Y', 'Sample Z', 'More']
     step_list = ['Sample Y', 'Sample Z', 'More', 'Custom']
 
+    # more list should contain all fly motors not included in fly_list
     more_list = [
         'Sample X',
         'Omega',
         'Pinhole y',
         'Pinhole z']
 
+    # counter list same for all endstations
     counter_list = [
         'Beamstop diode',
         'Removable diode',
@@ -2592,36 +2610,46 @@ elif config.stack_choice.get() == 'BMB':
         '50 MHz clock']
 
 elif config.stack_choice.get() == 'BMDHL':
-    # create epics Motors, pco Devices, Struck, bnc
+    # create objects including epics Motors, Struck, etc
+    # define 5-motor sample stack
     mX = Motor('16BMD:m38')
     mY = Motor('16BMD:m39')
     mZ = Motor('16BMD:m13')
     mW = Motor('16BMD:m37')
     mYbase = Motor('16BMD:m36')
 
+    # define xps ip (if needed)
+    # xps_ip = '164.54.164.xxx'
+
+    # define any additional flyscan motors
     mMonoX = Motor('16BMD:m67')
     mPinY = Motor('16BMD:m33')
     mPinZ = Motor('16BMD:m54')
+    # mBSY = Motor('16BMD:mxx')
+    # mBSz = Motor('16BMD:mxx')
 
+    # define struck, softGlue, SG_Config, and abort PV
     mcs = Struck('16BMD:SIS1:')
     softglue = Device('16BMD:softGlue:', softglue_args)
     sg_config = Device('16BMD:SGMenu:', sg_config_args)
+    # abort = PV('16BMD:Unidig1Boxx')
 
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
     stage_dict = {
-        'Sample X': ['MAXV', mX, 'FI1_Signal', 0.25],
-        'Sample Y': ['MAXV', mY, 'FI2_Signal', 0.25],
-        'Sample Z': ['MAXV', mZ, 'FI3_Signal', 0.015],
-        'Omega': ['MAXV', mW, 'FI4_Signal', 2],
-        'Pinhole y': ['MAXV', mPinY, 'FI5_Signal', 0.25],
-        'Pinhole z': ['MAXV', mPinZ, 'FI6_Signal', 0.25],
-        'Mono X Translation': ['MAXV', mMonoX, 'FI7_Signal', 0.2]}
+        'Sample X': ['MAXV', mX, 'FI3_Signal', 0.25],
+        'Sample Y': ['MAXV', mY, 'FI4_Signal', 0.25],
+        'Sample Z': ['MAXV', mZ, 'FI5_Signal', 0.020],
+        'Omega': ['MAXV', mW, 'FI6_Signal', 2],
+        'Pinhole y': ['MAXV', mPinY, 'FI7_Signal', 0.25],
+        'Pinhole z': ['MAXV', mPinZ, 'FI8_Signal', 0.25],
+        'Mono X Translation': ['MAXV', mMonoX, 'FI11_Signal', 0.2]}
 
     # create lists for drop-down menus
     fly_list = ['Sample Y', 'Sample Z', 'More']
     step_list = ['Sample Y', 'Sample Z', 'More', 'Custom']
 
+    # more list should contain all fly motors not included in fly_list
     more_list = [
         'Sample X',
         'Omega',
@@ -2629,6 +2657,7 @@ elif config.stack_choice.get() == 'BMDHL':
         'Pinhole z',
         'Mono X Translation']
 
+    # counter list same for all endstations
     counter_list = [
         'Beamstop diode',
         'Removable diode',
@@ -2637,17 +2666,18 @@ elif config.stack_choice.get() == 'BMDHL':
         '50 MHz clock']
 
 elif config.stack_choice.get() == 'GPHP':
-    # create epics Motors, pco Devices, Struck, bnc
+    # create objects including epics Motors, Struck, etc
+    # define 5-motor sample stack
     mX = Motor('XPSGP:m1')
     mY = Motor('XPSGP:m2')
     mZ = Motor('XPSGP:m3')
     mW = Motor('XPSGP:m4')
     mYbase = Motor('16IDB:m4')
 
+    # define xps ip (if needed)
     xps_ip = '164.54.164.24'
 
-    mHSlit = Motor('16IDB:m21')
-    mVSlit = Motor('16IDB:m22')
+    # define any additional flyscan motors
     mLgPinY = Motor('16IDB:m19')
     mLgPinZ = Motor('16IDB:m24')
     mSmPinY = Motor('16IDB:m17')
@@ -2655,36 +2685,34 @@ elif config.stack_choice.get() == 'GPHP':
     mBSY = Motor('16IDB:m34')
     mBSZ = Motor('16IDB:m35')
 
+    # define struck, softGlue, SG_Config, and abort PV
     mcs = Struck('16IDB:SIS1:')
     softglue = Device('16IDB:softGlue:', softglue_args)
     sg_config = Device('16IDB:SGMenu:', sg_config_args)
     abort = PV('16IDB:Unidig1Bo6')
 
     # create dictionary for valid flyscan motors
-    # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
+    # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
     stage_dict = {
         'XPS Cen X': ['XPS', mX, 'FI1_Signal', 2.0],
         'XPS Cen Y': ['XPS', mY, 'FI1_Signal', 2.0],
         'XPS Sam Z': ['XPS', mZ, 'FI1_Signal', 2.0],
         'XPS Omega': ['XPS', mW, 'FI1_Signal', 20.0],
-        'GP Hslit Position': ['MAXV', mHSlit, 'FI5_Signal', 0.05],
-        'GP Vslit Position': ['MAXV', mVSlit, 'FI6_Signal', 0.05],
         'GP LKB Pinhole Y': ['MAXV', mLgPinY, 'FI7_Signal', 0.3],
         'GP LKB Pinhole Z': ['MAXV', mLgPinZ, 'FI8_Signal', 0.3],
         'GP SKB Pinhole Y': ['MAXV', mSmPinY, 'FI9_Signal', 0.3],
         'GP SKB Pinhole Z': ['MAXV', mSmPinZ, 'FI10_Signal', 0.3],
-        'GP Beamstop Y': ['MAXV', mBSY, 'FI15_Signal', 0.5],
-        'GP Beamstop Z': ['MAXV', mBSZ, 'FI16_Signal', 0.5]}
+        'GP Beamstop Y': ['MAXV', mBSY, 'FI11_Signal', 0.5],
+        'GP Beamstop Z': ['MAXV', mBSZ, 'FI12_Signal', 0.5]}
 
     # create lists for drop-down menus
     fly_list = ['XPS Cen Y', 'XPS Sam Z', 'More']
     step_list = ['XPS Cen Y', 'XPS Sam Z', 'More', 'Custom']
 
+    # more list should contain all fly motors not included in fly_list
     more_list = [
         'XPS Cen X',
         'XPS Omega',
-        'GP Hslit Position',
-        'GP Vslit Position',
         'GP LKB Pinhole Y',
         'GP LKB Pinhole Z',
         'GP SKB Pinhole Y',
@@ -2692,6 +2720,7 @@ elif config.stack_choice.get() == 'GPHP':
         'GP Beamstop Y',
         'GP Beamstop Z']
 
+    # counter list same for all endstations
     counter_list = [
         'Beamstop diode',
         'Removable diode',
@@ -2700,17 +2729,18 @@ elif config.stack_choice.get() == 'GPHP':
         '50 MHz clock']
 
 elif config.stack_choice.get() == 'GPHL':
-    # create epics Motors, pco Devices, Struck, bnc
+    # create objects including epics Motors, Struck, etc
+    # define 5-motor sample stack
     mX = Motor('16IDB:m31')
     mY = Motor('16IDB:m32')
     mZ = Motor('16IDB:m5')
     mW = Motor('XPSGP:m5')
     mYbase = Motor('16IDB:m4')
 
+    # define xps ip (if needed)
     xps_ip = '164.54.164.24'
 
-    mHSlit = Motor('16IDB:m21')
-    mVSlit = Motor('16IDB:m22')
+    # define any additional flyscan motors
     mLgPinY = Motor('16IDB:m19')
     mLgPinZ = Motor('16IDB:m24')
     mSmPinY = Motor('16IDB:m17')
@@ -2718,36 +2748,34 @@ elif config.stack_choice.get() == 'GPHL':
     mBSY = Motor('16IDB:m34')
     mBSZ = Motor('16IDB:m35')
 
+    # define struck, softGlue, SG_Config, and abort PV
     mcs = Struck('16IDB:SIS1:')
     softglue = Device('16IDB:softGlue:', softglue_args)
     sg_config = Device('16IDB:SGMenu:', sg_config_args)
     abort = PV('16IDB:Unidig1Bo6')
 
     # create dictionary for valid flyscan motors
-    # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
+    # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
     stage_dict = {
-        'GP CEN X': ['MAXV', mX, 'FI11_Signal', 1.0],
-        'GP CEN Y': ['MAXV', mY, 'FI12_Signal', 1.0],
-        'GP SAM Z': ['MAXV', mZ, 'FI13_Signal', 0.025],
+        'GP CEN X': ['MAXV', mX, 'FI3_Signal', 1.0],
+        'GP CEN Y': ['MAXV', mY, 'FI4_Signal', 1.0],
+        'GP SAM Z': ['MAXV', mZ, 'FI5_Signal', 0.025],
         'GP Omega': ['XPS', mW, 'FI1_Signal', 10.0],
-        'GP Hslit Position': ['MAXV', mHSlit, 'FI5_Signal', 0.05],
-        'GP Vslit Position': ['MAXV', mVSlit, 'FI6_Signal', 0.05],
         'GP LKB Pinhole Y': ['MAXV', mLgPinY, 'FI7_Signal', 0.3],
         'GP LKB Pinhole Z': ['MAXV', mLgPinZ, 'FI8_Signal', 0.3],
         'GP SKB Pinhole Y': ['MAXV', mSmPinY, 'FI9_Signal', 0.3],
         'GP SKB Pinhole Z': ['MAXV', mSmPinZ, 'FI10_Signal', 0.3],
-        'GP Beamstop Y': ['MAXV', mBSY, 'FI15_Signal', 0.5],
-        'GP Beamstop Z': ['MAXV', mBSZ, 'FI16_Signal', 0.5]}
+        'GP Beamstop Y': ['MAXV', mBSY, 'FI11_Signal', 0.5],
+        'GP Beamstop Z': ['MAXV', mBSZ, 'FI12_Signal', 0.5]}
 
     # create lists for drop-down menus
     fly_list = ['GP CEN Y', 'GP SAM Z', 'More']
     step_list = ['GP CEN Y', 'GP SAM Z', 'More', 'Custom']
 
+    # more list should contain all fly motors not included in fly_list
     more_list = [
         'GP CEN X',
         'GP Omega',
-        'GP Hslit Position',
-        'GP Vslit Position',
         'GP LKB Pinhole Y',
         'GP LKB Pinhole Z',
         'GP SKB Pinhole Y',
@@ -2755,6 +2783,7 @@ elif config.stack_choice.get() == 'GPHL':
         'GP Beamstop Y',
         'GP Beamstop Z']
 
+    # counter list same for all endstations
     counter_list = [
         'Beamstop diode',
         'Removable diode',
@@ -2763,41 +2792,46 @@ elif config.stack_choice.get() == 'GPHL':
         '50 MHz clock']
 
 elif config.stack_choice.get() == 'IDBLH':
-    # create epics Motors, pco Devices, Struck, bnc
+    # create objects including epics Motors, Struck, etc
+    # define 5-motor sample stack
     mX = Motor('XPSLH:m1')
     mY = Motor('XPSLH:m2')
     mZ = Motor('XPSLH:m3')
     mW = Motor('XPSLH:m4')
     mYbase = Motor('16IDB:m10')
 
+    # define xps ip (if needed)
     xps_ip = '164.54.164.104'
 
+    # define any additional flyscan motors
     mLgPinY = Motor('16IDB:m62')
     mLgPinZ = Motor('16IDB:m63')
     mBSY = Motor('16IDB:m67')
     mBSZ = Motor('16IDB:m68')
 
+    # define struck, softGlue, SG_Config, and abort PV
     mcs = Struck('16IDB:SIS1:')
     softglue = Device('16IDB:softGlue:', softglue_args)
     sg_config = Device('16IDB:SGMenu:', sg_config_args)
     abort = PV('16IDB:Unidig1Bo6')
 
     # create dictionary for valid flyscan motors
-    # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
+    # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
     stage_dict = {
-        'LH CEN X': ['XPS', mX, 'FI1_Signal', 2.0],
-        'LH CEN Y': ['XPS', mY, 'FI1_Signal', 2.0],
-        'LH SAM Z': ['XPS', mZ, 'FI1_Signal', 1.0],
-        'LH OMEGA': ['XPS', mW, 'FI1_Signal', 20.0],
-        'LH Pinhole Y': ['MAXV', mLgPinY, 'FI29_Signal', 0.3],
-        'LH Pinhole Z': ['MAXV', mLgPinZ, 'FI30_Signal', 0.3],
-        'LH Beamstop Y': ['MAXV', mBSY, 'FI33_Signal', 0.3],
-        'LH Beamstop Z': ['MAXV', mBSZ, 'FI34_Signal', 0.3]}
+        'LH CEN X': ['XPS', mX, 'FI25_Signal', 2.0],
+        'LH CEN Y': ['XPS', mY, 'FI25_Signal', 2.0],
+        'LH SAM Z': ['XPS', mZ, 'FI25_Signal', 1.0],
+        'LH OMEGA': ['XPS', mW, 'FI25_Signal', 20.0],
+        'LH Pinhole Y': ['MAXV', mLgPinY, 'FI27_Signal', 0.3],
+        'LH Pinhole Z': ['MAXV', mLgPinZ, 'FI28_Signal', 0.3],
+        'LH Beamstop Y': ['MAXV', mBSY, 'FI29_Signal', 0.3],
+        'LH Beamstop Z': ['MAXV', mBSZ, 'FI30_Signal', 0.3]}
 
     # create lists for drop-down menus
     fly_list = ['LH CEN Y', 'LH SAM Z', 'More']
     step_list = ['LH CEN Y', 'LH SAM Z', 'More', 'Custom']
 
+    # more list should contain all fly motors not included in fly_list
     more_list = [
         'LH CEN X',
         'LH OMEGA',
@@ -2806,48 +2840,7 @@ elif config.stack_choice.get() == 'IDBLH':
         'LH Beamstop Y',
         'LH Beamstop Z']
 
-    counter_list = [
-        'Beamstop diode',
-        'Removable diode',
-        'Hutch reference',
-        'FOE ion chamber',
-        '50 MHz clock']
-
-elif config.stack_choice.get() == 'TEST':
-    # create epics Motors, pco Devices, Struck, bnc
-    mX = Motor('XPSTEST:m1')
-    mY = Motor('XPSTEST:m2')
-    mZ = Motor('XPSTEST:m3')
-    mW = Motor('XPSTEST:m4')
-    mYbase = Motor('16TEST1:m9')
-
-    xps_ip = '164.54.164.24'
-
-    mT = Motor('16TEST1:m9')
-
-    mcs = Struck('16TEST1:SIS1:')
-    softglue = Device('16TEST1:softGlue:', softglue_args)
-    sg_config = Device('16TEST1:SGMenu:', sg_config_args)
-    abort = PV('16TEST1:Unidig1Bo0')
-
-    # create dictionary for valid flyscan motors
-    # 'NAME': [controller, designation, pco, bnc, softGlue, VMAX (in egu/s)]
-    stage_dict = {
-        'XPS TEST X': ['XPS', mX, 'FI1_Signal', 2.0],
-        'XPS TEST Y': ['XPS', mY, 'FI1_Signal', 2.0],
-        'XPS TEST Z': ['XPS', mZ, 'FI1_Signal', 2.0],
-        'XPS TEST W': ['XPS', mW, 'FI1_Signal', 20.0],
-        'M9': ['MAXV', mT, 'FI9_Signal', 1.0]}
-
-    # create lists for drop-down menus
-    fly_list = ['XPS TEST Y', 'XPS TEST Z', 'More']
-    step_list = ['XPS TEST Y', 'XPS TEST Z', 'More', 'Custom']
-
-    more_list = [
-        'XPS TEST X',
-        'XPS TEST W',
-        'M9']
-
+    # counter list same for all endstations
     counter_list = [
         'Beamstop diode',
         'Removable diode',
@@ -2856,27 +2849,34 @@ elif config.stack_choice.get() == 'TEST':
         '50 MHz clock']
 
 elif config.stack_choice.get() == 'IDD':
-    # create epics Motors, pco Devices, Struck, bnc
+    # create objects including epics Motors, Struck, etc
+    # define 5-motor sample stack
     mX = Motor('16IDD:m29')
     mY = Motor('16IDD:m19')
     mZ = Motor('16IDD:m13')
     mW = Motor('16IDD:m27')
     mYbase = Motor('16IDD:m2')
 
+    # define xps ip (if needed)
+    # xps_ip = '164.54.164.xxx'
+
+    # define any additional flyscan motors
     mPinY = Motor('16IDD:m12')
     mPinZ = Motor('16IDD:m11')
 
+    # define struck, softGlue, SG_Config, and abort PV
     mcs = Struck('16IDD:SIS1:')
     softglue = Device('16IDD:softGlue:', softglue_args)
     sg_config = Device('16IDD:SGMenu:', sg_config_args)
+    # abort = PV('16IDD:Unidig1Boxx')
 
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
     stage_dict = {
-        'Sample_X': ['MAXV', mX, 'FI1_Signal', 1.00],
-        'Sample_Y': ['MAXV', mY, 'FI2_Signal', 1.00],
-        'Sample_Z': ['MAXV', mZ, 'FI3_Signal', 0.90],
-        'Sample_Omega': ['MAXV', mW, 'FI5_Signal', 2.5],
+        'Sample_X': ['MAXV', mX, 'FI3_Signal', 1.00],
+        'Sample_Y': ['MAXV', mY, 'FI4_Signal', 1.00],
+        'Sample_Z': ['MAXV', mZ, 'FI5_Signal', 0.90],
+        'Sample_Omega': ['MAXV', mW, 'FI6_Signal', 2.5],
         'Pinhole_Y': ['MAXV', mPinY, 'FI7_Signal', 0.25],
         'Pinhole_Z': ['MAXV', mPinZ, 'FI8_Signal', 0.25]}
 
@@ -2884,12 +2884,62 @@ elif config.stack_choice.get() == 'IDD':
     fly_list = ['Sample_Y', 'Sample_Z', 'More']
     step_list = ['Sample_Y', 'Sample_Z', 'More', 'Custom']
 
+    # more list should contain all fly motors not included in fly_list
     more_list = [
         'Sample_X',
         'Sample_Omega',
         'Pinhole_Y',
         'Pinhole_Z']
 
+    # counter list same for all endstations
+    counter_list = [
+        'Beamstop diode',
+        'Removable diode',
+        'Hutch reference',
+        'FOE ion chamber',
+        '50 MHz clock']
+
+elif config.stack_choice.get() == 'TEST':
+    # create objects including epics Motors, Struck, etc
+    # define 5-motor sample stack
+    mX = Motor('16TEST1:m10')
+    mY = Motor('16TEST1:m9')
+    mZ = Motor('16TEST1:m11')
+    mW = Motor('16TEST1:m12')
+    mYbase = Motor('16TEST1:m13')
+
+    # define xps ip (if needed)
+    # xps_ip = '164.54.164.xxx'
+
+    # define any additional flyscan motors
+    mT = Motor('16TEST1:m14')
+
+    # define struck, softGlue, SG_Config, and abort PV
+    mcs = Struck('16TEST1:SIS1:')
+    softglue = Device('16TEST1:softGlue:', softglue_args)
+    sg_config = Device('16TEST1:SGMenu:', sg_config_args)
+    abort = PV('16TEST1:Unidig1Bo0')
+
+    # create dictionary for valid flyscan motors
+    # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
+    stage_dict = {
+        'TEST X': ['MAXV', mX, 'FI3_Signal', 2.0],
+        'TEST Y': ['MAXV', mY, 'FI4_Signal', 2.0],
+        'TEST Z': ['MAXV', mZ, 'FI5_Signal', 2.0],
+        'TEST W': ['MAXV', mW, 'FI6_Signal', 20.0],
+        'M14': ['MAXV', mT, 'FI7_Signal', 1.0]}
+
+    # create lists for drop-down menus
+    fly_list = ['TEST Y', 'TEST Z', 'More']
+    step_list = ['TEST Y', 'TEST Z', 'More', 'Custom']
+
+    # more list should contain all fly motors not included in fly_list
+    more_list = [
+        'TEST X',
+        'TEST W',
+        'M14']
+
+    # counter list same for all endstations
     counter_list = [
         'Beamstop diode',
         'Removable diode',
@@ -2900,22 +2950,22 @@ elif config.stack_choice.get() == 'IDD':
 # Primary frames for displaying objects
 framePlot = Frame(root)
 framePlot.grid(row=0, rowspan=4, column=0, sticky='n')
+frameFiles = Frame(root, width=652, height=123, bd=5, relief=RIDGE, padx=10, pady=5)
+frameFiles.grid(row=4, column=0, sticky='nsew')
 frameScanBox = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
 frameScanBox.grid(row=0, column=1, sticky='ew')
 frameCentering = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
 frameCentering.grid(row=1, column=1, sticky='ew')
 frameIntensity = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
 frameIntensity.grid(row=2, column=1, sticky='ew')
-frameImages = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
-frameImages.grid(row=5, column=1, sticky='nsew')
+# frameImages = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
+# frameImages.grid(row=5, column=1, sticky='nsew')
 framePosition = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
 framePosition.grid(row=3, column=1, sticky='nsew')
 frameActions = Frame(root, width=595, bd=5, relief=RIDGE, padx=10, pady=10)
 frameActions.grid(row=4, column=1, sticky='ew')
-frameFiles = Frame(root, width=652, height=123, bd=5, relief=RIDGE, padx=10, pady=5)
-frameFiles.grid(row=4, column=0, sticky='nsew')
-frameOverlays = Frame(root, width=652, bd=5, relief=RIDGE, padx=10, pady=5)
-frameOverlays.grid(row=5, column=0, sticky='ew')
+# frameOverlays = Frame(root, width=652, bd=5, relief=RIDGE, padx=10, pady=5)
+# frameOverlays.grid(row=5, column=0, sticky='ew')
 
 # make a drawing area
 fig = plt.figure(figsize=(9, 6.7))
@@ -2928,19 +2978,20 @@ toolbar.grid(row=1, column=0, sticky='ew')
 core = CoreData()
 
 # collections of objects to put in frames above
+data = DataLoad(frameFiles)
 fly_axis = ScanBox(frameScanBox, label='Fly axis')
 step_axis = ScanBox(frameScanBox, label='Step axis')
 scan = ScanActions(frameScanBox)
-counter = Counters(frameIntensity)
-image = Images(frameImages)
 center = Centering(frameCentering)
+counter = Counters(frameIntensity)
 hax = Position(framePosition, label='Horizontal axis')
 vax = Position(framePosition, label='Vertical axis')
 action = Actions(frameActions)
-data = DataLoad(frameFiles)
-over1 = Overlay(frameOverlays, label='over1')
-over2 = Overlay(frameOverlays, label='over2')
-over3 = Overlay(frameOverlays, label='over3')
+alloverlays = OverlayWindow(root)
+over1 = Overlay(alloverlays.frame, label='over1')
+over2 = Overlay(alloverlays.frame, label='over2')
+over3 = Overlay(alloverlays.frame, label='over3')
+image = Images(root)
 staff = Staff(root)
 
 # next eight lines are temporary home for widgets in the plot area
@@ -2956,9 +3007,10 @@ difference_label.grid(row=0, column=2)
 
 cid = fig.canvas.mpl_connect('button_press_event', onclick)
 root.protocol('WM_DELETE_WINDOW', close_quit)
-staff.popup.protocol('WM_DELETE_WINDOW', hide_window)
+staff.popup.protocol('WM_DELETE_WINDOW', hide_staff)
+image.popup.protocol('WM_DELETE_WINDOW', hide_image)
+alloverlays.popup.protocol('WM_DELETE_WINDOW', hide_alloverlays)
 root.update_idletasks()
 root.deiconify()
-action.more_less()
 step_axis.set_directory()
 root.mainloop()
