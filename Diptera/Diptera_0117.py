@@ -646,8 +646,8 @@ class ScanActions:
             else:
                 min_count = float(fly_axis.step_size.get()/max_v)
                 showwarning('Velocity warning',
-                         'Calculated velocity exceeds stage capabilities\n'
-                         'Try a COUNT TIME greater than %.3f seconds.' % min_count)
+                            'Calculated velocity exceeds stage capabilities\n'
+                            'Try a COUNT TIME greater than %.3f seconds.' % min_count)
                 return
             # end temp velo check, resume calculations
             # ### 8 Dec 2016 end part to edit out
@@ -659,6 +659,19 @@ class ScanActions:
             abs_fly_max = mFly_ipos + fly_axis.rel_max.get()
             fly_zero = abs_fly_min - temp_velo * mW.ACCL * 1.5
             fly_final = abs_fly_max + temp_velo * mW.ACCL * 1.5
+            # make trajectory and establish communication with XPS
+            make_trajectory(zero=fly_zero, min=abs_fly_min, max=abs_fly_max, velo=temp_velo, motor=mFly)
+            myxps = XPS_Q8_drivers.XPS()
+            socketId = myxps.TCP_ConnectToServer(xps_ip, 5001, 20)
+            # do temp_velo check here for XPS
+            preflight = myxps.MultipleAxesPVTVerification(socketId, 'M', 'traj.trj')
+            print preflight[0]
+            if not preflight[0] == 0:
+                showwarning('Velocity warning',
+                            'Calculated velocity exceeds stage capabilities\n'
+                            'Try increasing count time (or increasing number of steps).')
+                myxps.TCP_CloseSocket(socketId)
+                return
         # initialize core arrays of the proper dimension
         core.FLY = np.linspace(abs_fly_plot_min, abs_fly_plot_max, fly_axis.npts.get() - 1)
         core.STP = np.linspace(abs_step_plot_min, abs_step_plot_max, step_axis.npts.get())
@@ -687,6 +700,8 @@ class ScanActions:
             showwarning('Limit Check Failed', 'One or more stage target(s) exceed limits')
             self.exp_time.set('%.3f' % perm_count)
             self.entry_exp_time.configure(bg='light blue')
+            if controller == 'XPS':
+                myxps.TCP_CloseSocket(socketId)
             return
         # end of pre-flight checks, scan will now proceed unless aborted
         # disable scan buttons so only one scan can be started
@@ -725,30 +740,22 @@ class ScanActions:
         hax.active_stage.set(h_active)
         plt.gcf().canvas.draw()
         framePlot.update_idletasks()
-        # set up trajectory for XPS and set up softglue
-        # note we no longer do a clear all, instead load config twice
-        # sg_config.put('name1', 'clear_all', wait=True)
-        # sg_config.put('loadConfig1.PROC', 1, wait=True)
+        # set up softglue
         softglue.put('BUFFER-1_IN_Signal', '1!', wait=True)
         if controller == 'MAXV':
-            # load softglue config
             sg_config.put('name2', 'step_master', wait=True)
             sg_config.put('loadConfig2.PROC', 1, wait=True)
             sg_config.put('loadConfig2.PROC', 1, wait=True)
             softglue.put('BUFFER-1_IN_Signal', '1!', wait=True)
-            # softglue.put('DnCntr-1_PRESET', accl_steps, wait=True)
             softglue.put('DnCntr-1_PRESET', accl_steps, wait=True)
             softglue.put('DivByN-1_N', micro_steps, wait=True)
         else:
             # controller must be XPS
-            # make trajectory and open communication with XPS
-            make_trajectory(zero=fly_zero, min=abs_fly_min, max=abs_fly_max, velo=temp_velo, motor=mFly)
-            myxps = XPS_Q8_drivers.XPS()
-            socketId = myxps.TCP_ConnectToServer(xps_ip, 5001, 20)
-            # load softglue config
             sg_config.put('name2', 'xps_master', wait=True)
             sg_config.put('loadConfig2.PROC', 1, wait=True)
             sg_config.put('loadConfig2.PROC', 1, wait=True)
+            softglue.put('BUFFER-1_IN_Signal', '1!', wait=True)
+            softglue.put('DnCntr-1_PRESET', 1, wait=True)
         softglue.put(sg_input, 'motor', wait=True)
         softglue.put('BUFFER-1_IN_Signal', '1!', wait=True)
         # enter for loop for npts flyscans
@@ -766,9 +773,10 @@ class ScanActions:
                 mStep.move(step_abs, wait=True)
             mFly.move(fly_zero, wait=True)
             time.sleep(.25)
-            # set temporary (scan) velocity and zero backlash
-            mFly.VELO = temp_velo
-            mFly.BDST = 0
+            # set temporary (scan) velocity and zero backlash (for MAXV only)
+            if controller == 'MAXV':
+                mFly.VELO = temp_velo
+                mFly.BDST = 0
             # initialize struck for collection
             mcs.stop()
             mcs.ExternalMode()
@@ -779,15 +787,14 @@ class ScanActions:
             mcs.NuseAll = fly_axis.npts.get() - 1
             # reset softglue for fresh counting
             softglue.put('BUFFER-1_IN_Signal', '1!', wait=True)
-            # initialize detector if necessary
+            # initialize and arm detector if necessary
             if image.flag.get():
                 prefix = image.user_path.get() + image.sample_name.get() + '_'
                 image_no = image.image_no.get()
                 suffix = '.tif'
                 first_filename = prefix + image_no + suffix
-                print first_filename
+                # print first_filename
                 if not os.path.isfile(first_filename):
-                    print "is not a file"
                     pass
                 else:
                     while os.path.isfile(first_filename):
@@ -810,7 +817,8 @@ class ScanActions:
             else:
                 myxps.MultipleAxesPVTPulseOutputSet(socketId, 'M', 2, 3, self.exp_time.get())
                 myxps.MultipleAxesPVTExecution(socketId, 'M', 'traj.trj', 1)
-                mFly.move(fly_final, wait=True)
+                # mFly.move(fly_final, wait=True)
+            time.sleep(.25)
             if image.flag.get():
                 while detector.Acquire:
                     time.sleep(0.1)
@@ -818,7 +826,7 @@ class ScanActions:
                 str_image_number = str(image_number)
                 image.image_no.set(str_image_number.zfill(3))
                 detector.FileNumber = image_number
-            # Feb 2016: Check enough pulses received, if not, notify user and recover
+            # Check enough pulses received, if not, notify user and recover
             pulses = softglue.get('UpCntr-2_COUNTS')
             if pulses >= fly_axis.npts.get():
                 # handle data
@@ -859,13 +867,6 @@ class ScanActions:
                 core.REF[steps] = REF_ara_bit
                 core.BSD[steps] = BSD_ara_bit
                 core.RMD[steps] = RMD_ara_bit
-                # move next four line after if/else
-                # ###mFly.VELO = perm_velo
-                # ###mFly.BDST = perm_bdst
-                # ###time.sleep(.25)
-                # ###update_plot()
-                # try this for not responding, possibly remove
-                # ###framePlot.update()
             else:
                 # print 'moving on this time'
                 showwarning('Pulse Count Error', message=('Stage failed to generate enough pulses \n'
