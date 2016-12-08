@@ -159,9 +159,9 @@ class ScanBox:
         elif label == 'Step axis':
             self.axis.set(step_list[1])
             self.flag.set(0)
-        self.rel_min.set('%.3f' % -.05)
-        self.step_size.set('%.4f' % .002)
-        self.rel_max.set('%.3f' % .05)
+        self.rel_min.set('%.3f' % -.10)
+        self.step_size.set('%.4f' % .004)
+        self.rel_max.set('%.3f' % .10)
         self.npts.set(51)
         if label == 'Step axis':
             self.scan_directory = StringVar()
@@ -524,7 +524,6 @@ class ScanActions:
     def start_scan(self):
         t_zero = time.clock()
         abort.put(0)
-        # ###make this a static method###
         # ensure scan directory and number have been specified
         if step_axis.scan_directory.get() == 'Select directory before scan':
             showwarning('Unspecified file destination',
@@ -568,13 +567,19 @@ class ScanActions:
             showwarning('Scan aborted',
                         'Modify Fly axis parameters until you have a green light')
             return
+        # make sure long count times are intentional
+        if self.exp_time.get() > 0.200:
+            if not askyesno('Confirm long count time',
+                            'Count time per point is more than 0.2 seconds.\n'
+                            'Do you want to continue?'):
+                return
         # write in active elements and determine dimension
-        if step_axis.flag.get():
-            step_npts = step_axis.npts.get()
-            v_active = step_axis.axis.get()
-        else:
+        if not step_axis.flag.get():
             step_npts = 1
             v_active = 'Counts'
+        else:
+            step_npts = step_axis.npts.get()
+            v_active = step_axis.axis.get()
         core.dimension = step_npts
         # define temporary EPICS motor devices, fly velocity, and scan endpoints
         controller, mFly, sg_input, v_max = stage_dict[fly_axis.axis.get()]
@@ -601,8 +606,8 @@ class ScanActions:
             elif temp_velo < min_v:
                 max_count = float(new_step_size/min_v)
                 showwarning('Velocity warning',
-                         'Calculated velocity too slow for stage capabilities\n'
-                         'Try a COUNT TIME less than %.3f seconds.' % max_count)
+                            'Calculated velocity too slow for stage capabilities\n'
+                            'Try a COUNT TIME less than %.3f seconds.' % max_count)
                 return
             else:
                 # count time is too short, auto fill for small differences
@@ -611,13 +616,13 @@ class ScanActions:
                     self.exp_time.set('%.3f' % min_count)
                     self.entry_exp_time.configure(bg='red')
                     root.update_idletasks()
-                    temp_velo = v_max
+                    temp_velo = max_v
                 else:
                     showwarning('Velocity warning',
                              'Calculated velocity exceeds stage capabilities\n'
                              'Try a COUNT TIME greater than %.3f seconds.' % min_count)
                     return
-            # end temp_velo check, resume calculations
+            # end temp_velo check, resume calculations for MAXV controller
             new_rel_min = fly_axis.rel_min.get()*new_step_size/fly_axis.step_size.get()
             new_rel_max = fly_axis.rel_max.get()*new_step_size/fly_axis.step_size.get()
             abs_step_plot_min = mStep_ipos + step_axis.rel_min.get()
@@ -630,10 +635,11 @@ class ScanActions:
             accl_distance = accl_steps*resolution
             fly_zero = abs_fly_min - accl_distance
             fly_final = abs_fly_max + accl_distance
-            accl_plus_fly_steps = (abs_fly_max - fly_zero)/resolution
+            # accl_plus_fly_steps = (abs_fly_max - fly_zero)/resolution
         else:
             # controller must be XPS (for now)
             temp_velo = fly_axis.step_size.get()/self.exp_time.get()
+            # ### 8 Dec 2016 for XPS this will be handled by a direct command to XPS ***
             # temp_velo check
             if min_v <= temp_velo <= max_v:
                 pass
@@ -644,6 +650,7 @@ class ScanActions:
                          'Try a COUNT TIME greater than %.3f seconds.' % min_count)
                 return
             # end temp velo check, resume calculations
+            # ### 8 Dec 2016 end part to edit out
             abs_step_plot_min = mStep_ipos + step_axis.rel_min.get()
             abs_step_plot_max = mStep_ipos + step_axis.rel_max.get()
             abs_fly_plot_min = mFly_ipos + fly_axis.rel_min.get() + 0.5*fly_axis.step_size.get()
@@ -683,15 +690,17 @@ class ScanActions:
             return
         # end of pre-flight checks, scan will now proceed unless aborted
         # disable scan buttons so only one scan can be started
-        # ALso provide indication that scan is taking place
+        # provide indication that scan is taking place
         self.button_start_flyscan.config(state=DISABLED, text='Scanning . . .')
         self.button_fly_y.config(state=DISABLED)
         self.button_fly_z.config(state=DISABLED)
         # clear plot and fields
         plt.clf()
+        # ###check to function these lines
         data.current_slice.set(1)
         data.slice_flag.set(0)
         data.index.set(1)
+        # ###or maybe these lines
         center.y_minus_pos.set('')
         center.y_center_pos.set('')
         center.y_plus_pos.set('')
@@ -716,14 +725,15 @@ class ScanActions:
         hax.active_stage.set(h_active)
         plt.gcf().canvas.draw()
         framePlot.update_idletasks()
-        # set up and enable pco and softglue
+        # set up trajectory for XPS and set up softglue
+        # note we no longer do a clear all, instead load config twice
         # sg_config.put('name1', 'clear_all', wait=True)
         # sg_config.put('loadConfig1.PROC', 1, wait=True)
         softglue.put('BUFFER-1_IN_Signal', '1!', wait=True)
         if controller == 'MAXV':
             # load softglue config
             sg_config.put('name2', 'step_master', wait=True)
-            sg_config.put('name2', 'step_master', wait=True)
+            sg_config.put('loadConfig2.PROC', 1, wait=True)
             sg_config.put('loadConfig2.PROC', 1, wait=True)
             softglue.put('BUFFER-1_IN_Signal', '1!', wait=True)
             # softglue.put('DnCntr-1_PRESET', accl_steps, wait=True)
@@ -731,12 +741,13 @@ class ScanActions:
             softglue.put('DivByN-1_N', micro_steps, wait=True)
         else:
             # controller must be XPS
+            # make trajectory and open communication with XPS
             make_trajectory(zero=fly_zero, min=abs_fly_min, max=abs_fly_max, velo=temp_velo, motor=mFly)
             myxps = XPS_Q8_drivers.XPS()
             socketId = myxps.TCP_ConnectToServer(xps_ip, 5001, 20)
             # load softglue config
             sg_config.put('name2', 'xps_master', wait=True)
-            sg_config.put('name2', 'xps_master', wait=True)
+            sg_config.put('loadConfig2.PROC', 1, wait=True)
             sg_config.put('loadConfig2.PROC', 1, wait=True)
         softglue.put(sg_input, 'motor', wait=True)
         softglue.put('BUFFER-1_IN_Signal', '1!', wait=True)
