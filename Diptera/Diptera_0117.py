@@ -10,6 +10,7 @@ from tkMessageBox import *
 from tkFileDialog import *
 import tkFont
 import os.path
+from shutil import copyfile
 from epics import *
 from epics.devices import Struck
 import numpy as np
@@ -68,7 +69,7 @@ class ExpConfigure:
             ('IDB GP High Precision', 'GPHP'),
             ('IDB GP High Load', 'GPHL'),
             ('IDB Laser Heating Table', 'IDBLH'),
-            ('IDD Spectroscopy', 'IDD'),]
+            ('IDD Spectroscopy', 'IDD')]
             # ###('Test', 'TEST')]
 
         # make radio buttons for stages using lists
@@ -788,7 +789,7 @@ class ScanActions:
             # reset softglue for fresh counting
             softglue.put('BUFFER-1_IN_Signal', '1!', wait=True)
             # initialize and arm detector if necessary
-            if image.flag.get():
+            if image.enable_flag.get():
                 prefix = image.user_path.get() + image.sample_name.get() + '_'
                 image_no = image.image_no.get()
                 suffix = '.tif'
@@ -819,7 +820,7 @@ class ScanActions:
                 myxps.MultipleAxesPVTExecution(socketId, 'M', 'traj.trj', 1)
                 # mFly.move(fly_final, wait=True)
             time.sleep(.25)
-            if image.flag.get():
+            if image.enable_flag.get():
                 while detector.Acquire:
                     time.sleep(0.1)
                 image_number = detector.FileNumber + detector.NumImages - 1
@@ -881,10 +882,10 @@ class ScanActions:
             # try this for not responding, possibly remove
             framePlot.update()
         # recover
-        if image.flag.get():
+        if image.enable_flag.get():
             detector.TriggerMode = 0
             detector.NumImages = 1
-            image.flag.set(0)
+            image.enable_flag.set(0)
         softglue.put(sg_input, '')
         mFly.move(mFly_ipos, wait=True)
         mStep.move(mStep_ipos, wait=True)
@@ -905,6 +906,9 @@ class ScanActions:
                      rmd=core.RMD)
             new_index = str(int(index) + 1)
             step_axis.scan_no.set(new_index.zfill(3))
+        # for 2D
+        if image.ascii_flag.get():
+            data.save_ascii()
         step_axis.flag.set(0)
         if center.c_flag.get():
             data.current_slice.set(1)
@@ -915,6 +919,7 @@ class ScanActions:
         self.button_start_flyscan.config(state=NORMAL, text='START SCAN')
         self.button_fly_y.config(state=NORMAL)
         self.button_fly_z.config(state=NORMAL)
+        hax.calc_difference()
         t_elapsed = time.clock() - t_zero
         print t_elapsed
 
@@ -1267,6 +1272,10 @@ class Position:
                 return
 
     def calc_difference(self, *args):
+        # avoid doing cacl during scan, as it can give temporary/incorrect result
+        if scan.button_start_flyscan.cget('state') == 'disabled':
+            return
+        # only execute calculation for 1D scans (although could work for 2D)
         if core.dimension == 1 or data.slice_flag.get():
             try:
                 final_pos = float(hax.mid_pos.get())
@@ -1281,9 +1290,6 @@ class Position:
             else:
                 return
 
-
-    # January 2016: for three methods below, modify code to move v axis
-    # for dimension > 1, but not in centering mode!! (confusing for user).
     def move_min(self):
         if core.dimension == 1:
             try:
@@ -1512,6 +1518,14 @@ class DataLoad:
         np.savetxt(textfile, core.FLY, fmt='%6.4f', delimiter=', ', header=horizontal, footer='\n', comments='')
         np.savetxt(textfile, core.SCA, fmt='%.10e', delimiter=', ', header='Scaled Intensity', footer='End scan data' + '\n' * 2, comments='')
         textfile.close()
+        # option to automatically copy to user directory, esp. for 2d imaging, XRDI
+        # need to clean up a bit once we get path selection figured out (in SXD, too)
+        if image.ascii_flag.get():
+            source = textpath
+            filename = os.path.basename(textpath)
+            if os.path.exists(image.user_path.get()):
+                destination = image.user_path.get() + filename
+                copyfile(source, destination)
 
     def decrement_file(self):
         current_file = data.current_file.get()
@@ -1785,7 +1799,7 @@ class Images:
         self.frame.pack()
 
         # define instance variables and set defaults
-        self.flag = IntVar()
+        self.enable_flag = IntVar()
         self.det_path = StringVar()
         self.user_path = StringVar()
         self.sample_name = StringVar()
@@ -1793,8 +1807,10 @@ class Images:
         self.temp_file = StringVar()
         self.dioptas_flag = IntVar()
         self.grid_flag = IntVar()
-        self.flag.set(0)
-        self.user_path.set('P:\\2015-1\\HPCAT\\SXD_test\\')
+        self.ascii_flag = IntVar()
+        self.enable_flag.set(0)
+        self.user_path.set('Select directory before scan')
+        # self.user_path.set('Z:\\Python Analysis\\ascii\\')
         self.sample_name.set('test')
         self.image_no.set('001')
 
@@ -1803,7 +1819,7 @@ class Images:
         self.head_images.grid(row=0, column=0, columnspan=2, pady=5, sticky='w')
 
         # make and place widgets
-        self.check_image_enable = Checkbutton(self.frame, text='Enable', variable=self.flag, state=DISABLED)
+        self.check_image_enable = Checkbutton(self.frame, text='Enable', variable=self.enable_flag, state=DISABLED)
         self.check_image_enable.grid(row=1, rowspan=2, column=0, columnspan=2)
         self.label_det_path = Label(self.frame, text='Detector path')
         self.label_det_path.grid(row=0, column=2, padx=5, pady=5)
@@ -1837,6 +1853,8 @@ class Images:
         self.button_initialize.grid(row=3, column=0)
         self.cbox_activate_dioptas = Checkbutton(self.frame, text='Enable Dioptas', variable=self.dioptas_flag)
         self.cbox_activate_dioptas.grid(row=3, column=3, padx=5, pady=5)
+        self.cbox_write_ascii = Checkbutton(self.frame, text='Write ASCII', variable=self.ascii_flag)
+        self.cbox_write_ascii.grid(row=3, column=4, padx=5, pady=5)
 
         # hide window on startup
         self.popup.withdraw()
@@ -2220,7 +2238,7 @@ def hide_staff():
 
 def hide_image():
     image.popup.withdraw()
-    image.flag.set(0)
+    image.enable_flag.set(0)
 
 
 def hide_alloverlays():
@@ -2283,12 +2301,12 @@ def make_trajectory(zero, min, max, velo, motor):
         vi = 6
     else:
         # must be w, pick correct one
-        if config.stack_choice.get() == 'GPHL':
-            xi = 9
-            vi = 10
-        else:
+        if config.stack_choice.get() == 'GPHP':
             xi = 7
             vi = 8
+        else:
+            xi = 9
+            vi = 10
     line_a[xi] = str(delta_xac)
     line_a[vi] = str(velo_ab)
     line_b[0] = str(delta_tb)
