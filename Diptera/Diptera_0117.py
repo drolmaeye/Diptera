@@ -2662,7 +2662,7 @@ elif config.stack_choice.get() == 'BMDHL':
     mcs = Struck('16BMD:SIS1:')
     softglue = Device('16BMD:softGlue:', softglue_args)
     sg_config = Device('16BMD:SGMenu:', sg_config_args)
-    # abort = PV('16BMD:Unidig1Boxx')
+    abort = PV('16BMD:Unidig1Bo1')
 
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
@@ -2719,7 +2719,7 @@ elif config.stack_choice.get() == 'GPHP':
     mcs = Struck('16IDB:SIS1:')
     softglue = Device('16IDB:softGlue:', softglue_args)
     sg_config = Device('16IDB:SGMenu:', sg_config_args)
-    abort = PV('16IDB:Unidig1Bo6')
+    abort = PV('16IDB:Unidig1Bo1')
 
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
@@ -2782,7 +2782,7 @@ elif config.stack_choice.get() == 'GPHL':
     mcs = Struck('16IDB:SIS1:')
     softglue = Device('16IDB:softGlue:', softglue_args)
     sg_config = Device('16IDB:SGMenu:', sg_config_args)
-    abort = PV('16IDB:Unidig1Bo6')
+    abort = PV('16IDB:Unidig1Bo1')
 
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
@@ -2843,7 +2843,7 @@ elif config.stack_choice.get() == 'IDBLH':
     mcs = Struck('16IDB:SIS1:')
     softglue = Device('16IDB:softGlue:', softglue_args)
     sg_config = Device('16IDB:SGMenu:', sg_config_args)
-    abort = PV('16IDB:Unidig1Bo6')
+    abort = PV('16IDB:Unidig1Bo1')
 
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
@@ -2898,7 +2898,7 @@ elif config.stack_choice.get() == 'IDD':
     mcs = Struck('16IDD:SIS1:')
     softglue = Device('16IDD:softGlue:', softglue_args)
     sg_config = Device('16IDD:SGMenu:', sg_config_args)
-    # abort = PV('16IDD:Unidig1Boxx')
+    abort = PV('16IDD:Unidig1Bo1')
 
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
@@ -2948,7 +2948,7 @@ elif config.stack_choice.get() == 'TEST':
     mcs = Struck('16TEST1:SIS1:')
     softglue = Device('16TEST1:softGlue:', softglue_args)
     sg_config = Device('16TEST1:SGMenu:', sg_config_args)
-    abort = PV('16TEST1:Unidig1Bo0')
+    abort = PV('16TEST1:Unidig1Bo1')
 
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
