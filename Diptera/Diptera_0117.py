@@ -530,6 +530,12 @@ class ScanActions:
             showwarning('Unspecified file destination',
                         'Please select a valid scan directory and try again')
             return
+        # if writing ascii file, ensure user directory exists
+        if image.ascii_flag.get():
+            if image.label2_user_path.cget('bg') == 'red':
+                showwarning('Directory does not exist',
+                            'Please select a valid folder for writing ASCII file and try again')
+                return
         # generate filename and make sure it does not already exist
         prefix = step_axis.scan_directory.get() + 'fScan_'
         index = step_axis.scan_no.get()
@@ -1828,11 +1834,11 @@ class Images:
         self.display_det_path.grid(row=0, column=3, columnspan=3, pady=5)
         self.label_user_path = Label(self.frame, text='User directory')
         self.label_user_path.grid(row=1, column=2, padx=5, pady=5)
-        self.entry_user_path = Entry(self.frame, textvariable=self.user_path,
-                                     width=46)
-        self.entry_user_path.grid(row=1, column=3, columnspan=3, pady=5)
-        self.entry_user_path.bind('<FocusOut>', self.user_path_validation)
-        self.entry_user_path.bind('<Return>', self.user_path_validation)
+        self.label2_user_path = Label(self.frame, textvariable=self.user_path,
+                                      relief=SUNKEN, width=40, anchor='w')
+        self.label2_user_path.grid(row=1, column=3, columnspan=3, pady=5)
+        # self.entry_user_path.bind('<FocusOut>', self.user_path_validation)
+        # self.entry_user_path.bind('<Return>', self.user_path_validation)
         self.label_sample_name = Label(self.frame, text='Sample name')
         self.label_sample_name.grid(row=2, column=2, padx=5, pady=5)
         self.entry_sample_name = Entry(self.frame, textvariable=self.sample_name,
@@ -2268,6 +2274,18 @@ def beamsize_integral():
 
 def path_put(**kwargs):
     image.det_path.set(detector.get('FilePath_RBV', as_string=True))
+    # try autofill
+    result = image.det_path.get()
+    if result[0:13] == '/ramdisk/Data':
+        user_directory = 'P:' + result[13:]
+        windows_path = os.path.normpath(user_directory) + '\\'
+        image.user_path.set(windows_path)
+    else:
+        windows_path = 'path error'
+    if not os.path.exists(windows_path):
+        image.label2_user_path.config(bg='red')
+    else:
+        image.label2_user_path.config(bg='SystemButtonFace')
 
 
 def make_trajectory(zero, min, max, velo, motor):
