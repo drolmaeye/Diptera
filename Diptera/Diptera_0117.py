@@ -39,7 +39,7 @@ class ExpConfigure:
         # set up frames
         self.config_window = Toplevel(master)
         self.config_window.title('Select endstation')
-        self.config_window.geometry('250x300')
+        self.config_window.geometry('250x320')
         self.frame_stages = Frame(self.config_window)
         self.frame_stages.grid(row=0, column=0, pady=10)
 
@@ -69,8 +69,8 @@ class ExpConfigure:
             ('IDB GP High Precision', 'GPHP'),
             ('IDB GP High Load', 'GPHL'),
             ('IDB Laser Heating Table', 'IDBLH'),
-            ('IDD Spectroscopy', 'IDD')]
-            # ###('Test', 'TEST')]
+            ('IDD Spectroscopy', 'IDD'),
+            ('Test', 'TEST')]
 
         # make radio buttons for stages using lists
         for stacks, designation in stack_list:
@@ -291,17 +291,17 @@ class ScanBox:
             run = '2'
         folder = year + '-' + run
         stack = config.stack_choice.get()
-        if stack == 'BMBLT':
+        if stack == 'BMB':
             zeon_prefix = 'BMB TBD'
         elif stack == 'BMDHL':
             zeon_prefix = 'X:\\saveData\\16bmd\\'
         elif stack == 'GPHL' or stack == 'GPHP' or stack == 'IDBLH':
             zeon_prefix = 'W:\\16idb\\'
-        elif stack == 'TEST':
-            zeon_prefix = 'W:\\16Test1\\'
-        else:
-            # stack == 'IDD'
+        elif stack == 'IDD':
             zeon_prefix = 'IDD TBD'
+        else:
+            # stack is test
+            zeon_prefix = 'W:\\16Test1\\'
         # user_dir should have normal run designation, e.g., 2015-1
         user_dir = zeon_prefix + folder
         if os.path.exists(user_dir):
@@ -326,8 +326,6 @@ class ScanBox:
                 index = final_index
                 overwrite_warn()
             return self.scan_directory.set(new_directory), self.scan_no.set(index)
-        else:
-            pass
 
     def calc_size(self):
         # should be called on every position validation
@@ -389,7 +387,25 @@ class ScanBox:
             frame_pick.pack(pady=10)
             label_quickpick = Label(frame_pick, text='Quick picks')
             label_quickpick.grid(row=0, column=1, columnspan=2)
-            if config.stack_choice.get() == ('GPHP' or 'GPHL'):
+            if config.stack_choice.get() == 'BMB':
+                button_200v_curve = Button(frame_pick, text='Laue KB VFM Curvature', width=20, command=lambda: custom_stage.set('16BMA:pm27'))
+                button_200v_curve.grid(row=1, column=1, padx=5, pady=5)
+                button_200v_elip = Button(frame_pick, text='Laue KB VFM Ellipticity', width=20, command=lambda: custom_stage.set('16BMA:pm28'))
+                button_200v_elip.grid(row=2, column=1, padx=5, pady=5)
+                button_100v_curve = Button(frame_pick, text='Laue KB HFM Curvature', width=20, command=lambda: custom_stage.set('16BMA:pm25'))
+                button_100v_curve.grid(row=1, column=2, padx=5, pady=5)
+                button_100v_elip = Button(frame_pick, text='Laue KB HFM Ellipticity', width=20, command=lambda: custom_stage.set('16BMA:pm26'))
+                button_100v_elip.grid(row=2, column=2, padx=5, pady=5)
+            elif config.stack_choice.get() == 'BMDHL':
+                button_320v_curve = Button(frame_pick, text='Vertical Curvature', width=20, command=lambda: custom_stage.set('16BMD:pm23'))
+                button_320v_curve.grid(row=1, column=1, padx=5, pady=5)
+                button_320v_elip = Button(frame_pick, text='Vertical Ellipticity', width=20, command=lambda: custom_stage.set('16BMD:pm24'))
+                button_320v_elip.grid(row=2, column=1, padx=5, pady=5)
+                button_320h_curve = Button(frame_pick, text='Horizontal Curvature', width=20, command=lambda: custom_stage.set('16BMD:pm19'))
+                button_320h_curve.grid(row=1, column=2, padx=5, pady=5)
+                button_320h_elip = Button(frame_pick, text='Horizontal Ellipticity', width=20, command=lambda: custom_stage.set('16BMD:pm20'))
+                button_320h_elip.grid(row=2, column=2, padx=5, pady=5)
+            elif config.stack_choice.get() == ('GPHP' or 'GPHL'):
                 button_320v_curve = Button(frame_pick, text='320mm VKB Curvature', width=20, command=lambda: custom_stage.set('16IDB:pm15'))
                 button_320v_curve.grid(row=1, column=1, padx=5, pady=5)
                 button_320v_elip = Button(frame_pick, text='320mm VKB Ellipticity', width=20, command=lambda: custom_stage.set('16IDB:pm16'))
@@ -411,10 +427,19 @@ class ScanBox:
                 button_320v_curve.grid(row=1, column=1, padx=5, pady=5)
                 button_320v_elip = Button(frame_pick, text='LH VKB Ellipticity', width=20, command=lambda: custom_stage.set('16IDB:pm24'))
                 button_320v_elip.grid(row=2, column=1, padx=5, pady=5)
-                button_200v_curve = Button(frame_pick, text='LH HKB Curvature', width=20, command=lambda: custom_stage.set('16IDB:pm27'))
-                button_200v_curve.grid(row=1, column=2, padx=5, pady=5)
-                button_200v_elip = Button(frame_pick, text='LH HKB Ellipticity', width=20, command=lambda: custom_stage.set('16IDB:pm28'))
-                button_200v_elip.grid(row=2, column=2, padx=5, pady=5)
+                button_320h_curve = Button(frame_pick, text='LH HKB Curvature', width=20, command=lambda: custom_stage.set('16IDB:pm27'))
+                button_320h_curve.grid(row=1, column=2, padx=5, pady=5)
+                button_320h_elip = Button(frame_pick, text='LH HKB Ellipticity', width=20, command=lambda: custom_stage.set('16IDB:pm28'))
+                button_320h_elip.grid(row=2, column=2, padx=5, pady=5)
+            elif config.stack_choice.get() == 'IDD':
+                button_320v_curve = Button(frame_pick, text='Vert Curvature', width=20, command=lambda: custom_stage.set('16IDD:pm19'))
+                button_320v_curve.grid(row=1, column=1, padx=5, pady=5)
+                button_320v_elip = Button(frame_pick, text='Vert Ellipticity', width=20, command=lambda: custom_stage.set('16IDD:pm20'))
+                button_320v_elip.grid(row=2, column=1, padx=5, pady=5)
+                button_400h_curve = Button(frame_pick, text='Horiz Curvature', width=20, command=lambda: custom_stage.set('16IDD:pm15'))
+                button_400h_curve.grid(row=1, column=2, padx=5, pady=5)
+                button_400h_elip = Button(frame_pick, text='Horiz Ellipticity', width=20, command=lambda: custom_stage.set('16IDD:pm16'))
+                button_400h_elip.grid(row=2, column=2, padx=5, pady=5)
             entry.focus_set()
             root.wait_window(popup)
             prefix = custom_stage.get()
@@ -671,9 +696,9 @@ class ScanActions:
             myxps = XPS_Q8_drivers.XPS()
             socketId = myxps.TCP_ConnectToServer(xps_ip, 5001, 20)
             # do temp_velo check here for XPS
-            preflight = myxps.MultipleAxesPVTVerification(socketId, 'M', 'traj.trj')
-            print preflight[0]
-            if not preflight[0] == 0:
+            dynamics_check = myxps.MultipleAxesPVTVerification(socketId, 'M', 'traj.trj')
+            print dynamics_check[0]
+            if not dynamics_check[0] == 0:
                 showwarning('Velocity warning',
                             'Calculated velocity exceeds stage capabilities\n'
                             'Try increasing count time (or increasing number of steps).')
@@ -838,18 +863,24 @@ class ScanActions:
             if pulses >= fly_axis.npts.get():
                 # handle data
                 stack = config.stack_choice.get()
-                if stack == 'BMDHL':
+                if stack == 'BMB':
+                    TIM_ara = mcs.readmca(1)
+                    FOE_ara = mcs.readmca(1)
+                    REF_ara = mcs.readmca(1)
+                    BSD_ara = mcs.readmca(1)
+                    RMD_ara = mcs.readmca(1)
+                elif stack == 'BMDHL':
                     TIM_ara = mcs.readmca(1)
                     FOE_ara = mcs.readmca(2)
                     REF_ara = mcs.readmca(2)
-                    BSD_ara = mcs.readmca(6)
+                    BSD_ara = mcs.readmca(3)
                     RMD_ara = mcs.readmca(3)
                 elif stack == 'IDD':
                     TIM_ara = mcs.readmca(1)
                     FOE_ara = mcs.readmca(1)
                     REF_ara = mcs.readmca(5)
                     BSD_ara = mcs.readmca(1)
-                    RMD_ara = mcs.readmca(6)
+                    RMD_ara = mcs.readmca(7)
                 else:
                     # stack belongs to IDB
                     TIM_ara = mcs.readmca(1)
@@ -883,7 +914,6 @@ class ScanActions:
                             'Ask you local contact for assistance'))
             mFly.VELO = perm_velo
             mFly.BDST = perm_bdst
-            time.sleep(.25)
             update_plot()
             # try this for not responding, possibly remove
             framePlot.update()
@@ -912,7 +942,6 @@ class ScanActions:
                      rmd=core.RMD)
             new_index = str(int(index) + 1)
             step_axis.scan_no.set(new_index.zfill(3))
-        # for 2D
         if image.ascii_flag.get():
             data.save_ascii()
         step_axis.flag.set(0)
@@ -947,7 +976,7 @@ class Centering:
         self.absolute_y = StringVar()
         self.delta_y_base = StringVar()
         self.absolute_y_base = StringVar()
-        self.delta_w.set(2.0)
+        self.delta_w.set(6.0)
 
         # set up trace on c_flag to verify buttons are disabled
         self.c_flag.trace('w', self.disable_move_buttons)
@@ -995,13 +1024,9 @@ class Centering:
         else:
             center.button_absolute_x.config(state=NORMAL, background='green')
             staff.button_move_all.config(state=NORMAL, background='green')
-            # ###start test code to account for omega angle error### #
             ortho_factor = cos(radians(center.delta_w.get()))
             dsx_plus = ortho_factor*(float(center.y_plus_pos.get()) - float(center.y_center_pos.get()))
             dsx_minus = ortho_factor*(float(center.y_minus_pos.get()) - float(center.y_center_pos.get()))
-            # ###end test code### #
-            # ###dsx_plus = float(center.y_plus_pos.get()) - float(center.y_center_pos.get())
-            # ###dsx_minus = float(center.y_minus_pos.get()) - float(center.y_center_pos.get())
             delta_x = (dsx_plus - dsx_minus)/2/(sin(radians(center.delta_w.get())))
             delta_y = (dsx_plus + dsx_minus)/2/(cos(radians(center.delta_w.get()))-1)
             delta_y_base = -delta_y
@@ -2565,7 +2590,7 @@ root.title('Diptera')
 root.withdraw()
 config = ExpConfigure(root)
 # line below can be commented in/out and edited for autoconfig
-config.stack_choice.set('TEST')
+# config.stack_choice.set('TEST')
 if not config.stack_choice.get() == NONE:
     config.config_window.destroy()
 else:
@@ -2974,7 +2999,7 @@ elif config.stack_choice.get() == 'TEST':
         'TEST X': ['MAXV', mX, 'FI3_Signal', 2.0],
         'TEST Y': ['MAXV', mY, 'FI4_Signal', 2.0],
         'TEST Z': ['MAXV', mZ, 'FI5_Signal', 2.0],
-        'TEST W': ['MAXV', mW, 'FI6_Signal', 20.0],
+        'M12': ['MAXV', mW, 'FI6_Signal', 20.0],
         'M14': ['MAXV', mT, 'FI7_Signal', 1.0]}
 
     # create lists for drop-down menus
