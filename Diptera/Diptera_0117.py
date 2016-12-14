@@ -1004,6 +1004,8 @@ class Centering:
         self.cbox_c_flag.grid(row=1, column=0, padx=5, pady=5)
         self.entry_delta_w = Entry(self.frame, textvariable=self.delta_w, width=8)
         self.entry_delta_w.grid(row=1, column=2, padx=5, pady=5)
+        self.entry_delta_w.bind('<FocusOut>', self.delta_w_validate)
+        self.entry_delta_w.bind('<Return>', self.delta_w_validate)
         self.label_y_minus = Label(self.frame, textvariable=self.y_minus_pos, relief=SUNKEN, width=8)
         self.label_y_minus.grid(row=1, column=3, padx=5, pady=5)
         self.label_y_center = Label(self.frame, textvariable=self.y_center_pos, relief=SUNKEN, width=8)
@@ -1039,6 +1041,16 @@ class Centering:
             center.absolute_x.set('%.4f' % abs_x)
             center.absolute_y.set('%.4f' % abs_y)
             center.absolute_y_base.set('%.4f' % abs_base)
+
+    def delta_w_validate(self, *event):
+        try:
+            val = self.delta_w.get()
+            isinstance(val, float)
+            if not val > 0:
+                raise ValueError
+        except ValueError:
+            self.delta_w.set(6.0)
+            invalid_entry()
 
     def move_x(self):
         try:
@@ -1127,8 +1139,6 @@ class Counters:
         self.entry_scale.bind('<Return>', self.scale_validate)
         self.entry_data_type = OptionMenu(self.frame, self.data_type, *self.data_type_list)
         self.entry_data_type.grid(row=1, rowspan=2, column=5, padx=0)
-        # self.button_update = Button(self.frame, text='Update plot', command=update_plot)
-        # self.button_update.grid(row=1, rowspan=2, column=6, padx=0)
         self.entry_max_scale = Entry(self.frame, textvariable=self.max_scale, width=4)
         self.entry_max_scale.grid(row=1, column=7, padx=5, pady=5)
         self.entry_max_scale.bind('<FocusOut>', self.max_scale_validate)
@@ -1647,9 +1657,15 @@ class Actions:
         self.quit_button.grid(row=0, column=3, padx=8, pady=20)
 
     def open_overlays(self):
+        xtop = root.winfo_x()
+        ytop = root.winfo_y() + root.winfo_height() + 38
+        alloverlays.popup.geometry('+%d+%d' % (xtop, ytop))
         alloverlays.popup.deiconify()
 
     def open_imaging(self):
+        xtop = root.winfo_x() + 652
+        ytop = root.winfo_y() + root.winfo_height() + 38
+        image.popup.geometry('+%d+%d' % (xtop, ytop))
         image.popup.deiconify()
 
     def open_staff(self):
