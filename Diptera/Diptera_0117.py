@@ -592,6 +592,11 @@ class ScanActions:
                         'Stage cannot step and fly at the same time\n'
                         'Please select different stage(s) and try again')
             return
+        if fly_axis.axis.get() == 'More' or step_axis.axis.get() == 'More':
+            showwarning('No Stage Specified',
+                        'No stage specified for one or more axes\n'
+                        'Please select valid stage(s) and try again')
+            return
         # double-check that npts and step size work together
         fly_axis.npts_validate()
         step_axis.npts_validate()
@@ -1657,18 +1662,24 @@ class Actions:
         self.quit_button.grid(row=0, column=3, padx=8, pady=20)
 
     def open_overlays(self):
-        xtop = root.winfo_x()
-        ytop = root.winfo_y() + root.winfo_height() + 38
-        alloverlays.popup.geometry('+%d+%d' % (xtop, ytop))
+        if not alloverlays.popup.winfo_viewable():
+            xtop = root.winfo_x()
+            ytop = root.winfo_y() + root.winfo_height() + 40
+            alloverlays.popup.geometry('+%d+%d' % (xtop, ytop))
         alloverlays.popup.deiconify()
 
     def open_imaging(self):
-        xtop = root.winfo_x() + 652
-        ytop = root.winfo_y() + root.winfo_height() + 38
-        image.popup.geometry('+%d+%d' % (xtop, ytop))
+        if not image.popup.winfo_viewable():
+            xtop = root.winfo_x() + 652
+            ytop = root.winfo_y() + root.winfo_height() + 40
+            image.popup.geometry('+%d+%d' % (xtop, ytop))
         image.popup.deiconify()
 
     def open_staff(self):
+        if not staff.popup.winfo_viewable():
+            xtop = root.winfo_x() + 652
+            ytop = root.winfo_y() + root.winfo_height() + 40
+            staff.popup.geometry('+%d+%d' % (xtop, ytop))
         staff.popup.deiconify()
 
 
@@ -1899,7 +1910,7 @@ class Images:
         self.button_initialize = Button(self.frame, text='Initialize', command=self.initialize)
         self.button_initialize.grid(row=3, column=0)
         self.cbox_activate_dioptas = Checkbutton(self.frame, text='Enable Dioptas', variable=self.dioptas_flag)
-        self.cbox_activate_dioptas.grid(row=3, column=3, padx=5, pady=5)
+        # self.cbox_activate_dioptas.grid(row=3, column=3, padx=5, pady=5)
         self.cbox_write_ascii = Checkbutton(self.frame, text='Write ASCII', variable=self.ascii_flag)
         self.cbox_write_ascii.grid(row=3, column=4, padx=5, pady=5)
 
@@ -1907,11 +1918,58 @@ class Images:
         self.popup.withdraw()
 
     def initialize(self):
-        self.check_image_enable.configure(state=NORMAL)
+        # keep old style for now (0117) but limit to IDB
+        stack = config.stack_choice.get()
+        if not (stack == 'GPHL' or stack == 'GPHP' or stack == 'IDBLH'):
+            showwarning('Connection Error',
+                        'Cannot connect to detector\n'
+                        'Imaging not currently available at this endstation')
+            hide_image()
+            return
         global detector
         detector = Device('HP1M-PIL1:cam1:', detector_args)
         detector.add_callback('FilePath_RBV', callback=path_put)
         path_put()
+        self.check_image_enable.configure(state=NORMAL)
+        # lines below are basic framework for future implementation at other endstations
+        # ###custom_detector = StringVar()
+        # ###popup = Toplevel()
+        # ###xtop = root.winfo_x() + root.winfo_width() / 2 - 190
+        # ###ytop = root.winfo_y() + root.winfo_height() / 2 - 180
+        # ###popup.geometry('380x360+%d+%d' % (xtop, ytop))
+        # ###popup.title('Area detector selection')
+        # ###popup.grab_set()
+        # ###label_1 = Label(popup, text='Please enter a valid detector prefix')
+        # ###label_1.pack(side=TOP, pady=10)
+        # ###entry = Entry(popup, textvariable=custom_detector)
+        # ###entry.pack(pady=20)
+        # ###entry.bind('<Return>', lambda r: popup.destroy())
+        # ###button = Button(popup, text='OK', width=18, command=lambda: popup.destroy())
+        # ###button.pack(pady=10)
+        # ###frame_pick = Frame(popup)
+        # ###frame_pick.pack(pady=10)
+        # ###label_quickpick = Label(frame_pick, text='Quick picks')
+        # ###label_quickpick.grid(row=0, column=1, columnspan=2)
+        # ###button_pilatus = Button(frame_pick, text='PILATUS 1M', width=20,
+        # ###                        command=lambda: custom_detector.set('HP1M-PIL1:cam1'))
+        # ###button_pilatus.grid(row=1, column=1, padx=5, pady=5)
+        # ###button_perkinelmer = Button(frame_pick, text='Perkin Elmer', width=20,
+        # ###                            command=lambda: custom_detector.set('16PE:cam1'))
+        # ###button_perkinelmer.grid(row=2, column=1, padx=5, pady=5)
+        # ###entry.focus_set()
+        # ###root.wait_window(popup)
+        # ###prefix = custom_detector.get()
+        # ###global detector
+        # ###try:
+        # ###    detector = Device(prefix, detector_args)
+        # ###except:
+        # ###    showwarning('Invalid entry',
+        # ###                'Cannot connect to that detector')
+        # ###    return
+        # ###stack = config.stack_choice.get()
+        # ###if prefix == 'HP1M-PIL1:cam1':
+        # ###    if not (stack == 'GPHL' or stack == 'GPHP' or stack == 'IDBLH'):
+        # ###        print 'crazy'
 
     def choose_directory(self):
         user_dir = askdirectory(title='Select a user directory')
@@ -1941,24 +1999,26 @@ class Images:
             invalid_entry()
 
     def send_to_dioptas(self):
-        current_directory = self.user_path.get()
-        while not os.path.exists(current_directory):
-            self.choose_directory()
-            current_directory = self.user_path.get()
-        os.chdir(current_directory)
-        filename = self.sample_name.get() + '_' + str(data.index.get()).zfill(3) + '.tif'
-        full_filename = current_directory + filename
-        if not os.path.isfile(full_filename):
-            return
-        if not self.temp_file.get() == '':
-            old_temp = current_directory + self.temp_file.get()
-            if os.path.isfile(old_temp):
-                os.remove(old_temp)
-        temp_image = fabio.open(filename=filename)
-        temp_name = 'temp' + filename
-        self.temp_file.set(temp_name)
-        time.sleep(.5)
-        temp_image.write(temp_name)
+        # remove in 0117 version for now (and maybe forever)
+        pass
+        # current_directory = self.user_path.get()
+        # while not os.path.exists(current_directory):
+        #     self.choose_directory()
+        #     current_directory = self.user_path.get()
+        # os.chdir(current_directory)
+        # filename = self.sample_name.get() + '_' + str(data.index.get()).zfill(3) + '.tif'
+        # full_filename = current_directory + filename
+        # if not os.path.isfile(full_filename):
+        #     return
+        # if not self.temp_file.get() == '':
+        #     old_temp = current_directory + self.temp_file.get()
+        #     if os.path.isfile(old_temp):
+        #         os.remove(old_temp)
+        # temp_image = fabio.open(filename=filename)
+        # temp_name = 'temp' + filename
+        # self.temp_file.set(temp_name)
+        # time.sleep(.5)
+        # temp_image.write(temp_name)
 
 
 class Staff:
@@ -2601,7 +2661,7 @@ def update_plot(*args):
 Program start
 '''
 root = Tk()
-root.title('Diptera')
+# root.title('Diptera')
 # hide root, draw config window, wait for user input
 root.withdraw()
 config = ExpConfigure(root)
@@ -2648,6 +2708,7 @@ if config.use_file.get():
     user_config.close()
 # hard-encoded configuration options
 elif config.stack_choice.get() == 'BMB':
+    root.title('Diptera - BMB Laue Endstation')
     # create objects including epics Motors, Struck, etc
     # define 5-motor sample stack
     mX = Motor('XPSBMB:m1')
@@ -2699,6 +2760,7 @@ elif config.stack_choice.get() == 'BMB':
         '50 MHz clock']
 
 elif config.stack_choice.get() == 'BMDHL':
+    root.title('Diptera - BMD Endstation')
     # create objects including epics Motors, Struck, etc
     # define 5-motor sample stack
     mX = Motor('16BMD:m38')
@@ -2755,6 +2817,7 @@ elif config.stack_choice.get() == 'BMDHL':
         '50 MHz clock']
 
 elif config.stack_choice.get() == 'GPHP':
+    root.title('Diptera - IDB General Purpose Endstaion (high precision stages)')
     # create objects including epics Motors, Struck, etc
     # define 5-motor sample stack
     mX = Motor('XPSGP:m1')
@@ -2818,6 +2881,7 @@ elif config.stack_choice.get() == 'GPHP':
         '50 MHz clock']
 
 elif config.stack_choice.get() == 'GPHL':
+    root.title('Diptera - IDB General Purpose Endstaion (high load stages)')
     # create objects including epics Motors, Struck, etc
     # define 5-motor sample stack
     mX = Motor('16IDB:m31')
@@ -2881,6 +2945,7 @@ elif config.stack_choice.get() == 'GPHL':
         '50 MHz clock']
 
 elif config.stack_choice.get() == 'IDBLH':
+    root.title('Diptera - IDB Laser Heating Endstaion')
     # create objects including epics Motors, Struck, etc
     # define 5-motor sample stack
     mX = Motor('XPSLH:m1')
@@ -2938,6 +3003,7 @@ elif config.stack_choice.get() == 'IDBLH':
         '50 MHz clock']
 
 elif config.stack_choice.get() == 'IDD':
+    root.title('Diptera ~ IDD Endstation')
     # create objects including epics Motors, Struck, etc
     # define 5-motor sample stack
     mX = Motor('16IDD:m29')
@@ -2989,6 +3055,7 @@ elif config.stack_choice.get() == 'IDD':
         '50 MHz clock']
 
 elif config.stack_choice.get() == 'TEST':
+    root.title('Diptera - A real program for scanning imaginary stages')
     # create objects including epics Motors, Struck, etc
     # define 5-motor sample stack
     mX = Motor('16TEST1:m10')
@@ -3083,7 +3150,7 @@ over3 = Overlay(alloverlays.frame, label='over3')
 image = Images(root)
 staff = Staff(root)
 
-# next eight lines are temporary home for widgets in the plot area
+# next eight lines are for widgets in the plot area
 inner_frame = Frame(framePlot)
 inner_frame.grid(row=1, column=0, sticky='s')
 cbox_enable_grid = Checkbutton(inner_frame, text='Overlay 2D Grid', variable=image.grid_flag, command=update_plot)
@@ -3092,8 +3159,8 @@ difference_text = Label(inner_frame, text='Difference')
 difference_text.grid(row=0, column=1, padx=5)
 difference_label = Label(inner_frame, textvariable=hax.delta_pos, relief=SUNKEN, width=8)
 difference_label.grid(row=0, column=2)
-# end temporary home for widgets
 
+# rest of the stuff (may not be the best place, but . . .)
 cid = fig.canvas.mpl_connect('button_press_event', onclick)
 root.protocol('WM_DELETE_WINDOW', close_quit)
 staff.popup.protocol('WM_DELETE_WINDOW', hide_staff)
