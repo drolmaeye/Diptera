@@ -50,6 +50,7 @@ class ExpConfigure:
         self.use_file = BooleanVar()
         self.use_file.set(0)
 
+        # shopw stas
         # set up list to make buttons
         # ###master stack list###
         # ###stack_list = [
