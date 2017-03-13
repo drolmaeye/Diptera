@@ -2973,10 +2973,10 @@ elif config.stack_choice.get() == 'IDBLH':
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
     stage_dict = {
-        'LH CEN X': ['XPS', mX, 'FI25_Signal', 2.0],
-        'LH CEN Y': ['XPS', mY, 'FI25_Signal', 2.0],
-        'LH SAM Z': ['XPS', mZ, 'FI25_Signal', 1.0],
-        'LH OMEGA': ['XPS', mW, 'FI25_Signal', 20.0],
+        'LH CEN X': ['XPS', mX, 'FI1_Signal', 2.0],
+        'LH CEN Y': ['XPS', mY, 'FI1_Signal', 2.0],
+        'LH SAM Z': ['XPS', mZ, 'FI1_Signal', 1.0],
+        'LH OMEGA': ['XPS', mW, 'FI1_Signal', 20.0],
         'LH Pinhole Y': ['MAXV', mLgPinY, 'FI27_Signal', 0.3],
         'LH Pinhole Z': ['MAXV', mLgPinZ, 'FI28_Signal', 0.3],
         'LH Beamstop Y': ['MAXV', mBSY, 'FI29_Signal', 0.3],
