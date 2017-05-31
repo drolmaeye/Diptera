@@ -50,7 +50,6 @@ class ExpConfigure:
         self.use_file = BooleanVar()
         self.use_file.set(0)
 
-        # shopw stas
         # set up list to make buttons
         # ###master stack list###
         # ###stack_list = [
@@ -295,7 +294,7 @@ class ScanBox:
         if stack == 'BMB':
             zeon_prefix = 'BMB TBD'
         elif stack == 'BMDHL':
-            zeon_prefix = 'X:\\saveData\\16bmd\\'
+            zeon_prefix = 'Y:\\saveData\\16bmd\\'
         elif stack == 'GPHL' or stack == 'GPHP' or stack == 'IDBLH':
             zeon_prefix = 'W:\\16idb\\'
         elif stack == 'IDD':
