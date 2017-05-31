@@ -844,7 +844,7 @@ class ScanActions:
                 detector.AcquireTime = self.exp_time.get() - 0.003
                 detector.FileName = image.sample_name.get()
                 detector.TriggerMode = 2
-                detector.FileNumber = image.image_no.get()
+                detector.FileNumber = int(image.image_no.get())
                 detector.NumImages = fly_axis.npts.get() - 1
                 detector.Acquire = 1
             # Final actions plus data collection move
@@ -862,7 +862,7 @@ class ScanActions:
                 image_number = detector.FileNumber + detector.NumImages - 1
                 str_image_number = str(image_number)
                 image.image_no.set(str_image_number.zfill(3))
-                detector.FileNumber = image_number
+                detector.FileNumber = int(image_number)
             # Check enough pulses received, if not, notify user and recover
             pulses = softglue.get('UpCntr-2_COUNTS')
             if pulses >= fly_axis.npts.get():
