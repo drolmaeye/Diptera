@@ -65,7 +65,7 @@ class ExpConfigure:
         # working stack_list
         stack_list = [
             ('BMB Laue Table', 'BMB'),
-            ('BMD High Load', 'BMDHL'),
+            ('BMD High Precision', 'BMDHP'),
             ('BMD High Load', 'BMDHL'),
             ('IDB GP High Precision', 'GPHP'),
             ('IDB GP High Load', 'GPHL'),
@@ -103,7 +103,7 @@ class ExpConfigure:
         """
         stack = self.stack_choice.get()
         # valid list below created January 2016
-        valid_list = ['BMB', 'BMDHL', 'GPHP', 'GPHL', 'IDBLH', 'IDD', 'TEST']
+        valid_list = ['BMB', 'BMDHP', 'BMDHL', 'GPHP', 'GPHL', 'IDBLH', 'IDD', 'TEST']
         if stack not in valid_list:
             showerror('Under Development',
                       'Those stages are not yet available, program will exit')
@@ -2392,6 +2392,10 @@ def path_put(**kwargs):
 
 def make_trajectory(zero, min, max, velo, motor):
     if config.stack_choice.get() == 'IDBLH':
+        line_a = ['0.525', '0', '0', '0', '0', '0', '0', '0', '0']
+        line_b = ['0', '0', '0', '0', '0', '0', '0', '0', '0']
+        line_c = ['0.525', '0', '0', '0', '0', '0', '0', '0', '0']
+    elif config.stack_choice.get() == 'BMDHP':
         line_a = ['0.525', '0', '0', '0', '0', '0', '0', '0', '0']
         line_b = ['0', '0', '0', '0', '0', '0', '0', '0', '0']
         line_c = ['0.525', '0', '0', '0', '0', '0', '0', '0', '0']
