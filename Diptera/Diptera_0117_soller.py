@@ -2393,9 +2393,9 @@ def make_trajectory(zero, min, max, velo, motor):
         line_b = ['0', '0', '0', '0', '0', '0', '0', '0', '0']
         line_c = ['0.525', '0', '0', '0', '0', '0', '0', '0', '0']
     else:
-        line_a = ['0.525', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']
-        line_b = ['0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']
-        line_c = ['0.525', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']
+        line_a = ['0.525', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']
+        line_b = ['0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']
+        line_c = ['0.525', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']
     if motor.get('DIR') == 0:
         sign = 1
     else:
@@ -2416,14 +2416,22 @@ def make_trajectory(zero, min, max, velo, motor):
         # print 'z'
         xi = 5
         vi = 6
-    else:
-        # must be w, pick correct one
-        if config.stack_choice.get() == 'GPHP':
-            xi = 7
-            vi = 8
-        else:
+    elif motor == mW:
+        if config.stack_choice.get() == 'GPHL':
             xi = 9
             vi = 10
+        else:
+            xi = 7
+            vi = 8
+    elif motor == mSolX:
+        xi = 11
+        vi = 12
+    elif motor == mSolY:
+        xi = 13
+        vi = 14
+    elif motor == mSolT:
+        xi = 15
+        vi = 16
     line_a[xi] = str(delta_xac)
     line_a[vi] = str(velo_ab)
     line_b[0] = str(delta_tb)
@@ -2822,6 +2830,9 @@ elif config.stack_choice.get() == 'GPHP':
     mY = Motor('XPSGP:m2')
     mZ = Motor('XPSGP:m3')
     mW = Motor('XPSGP:m4')
+    mSolX = Motor('XPSGP:m6')
+    mSolY = Motor('XPSGP:m7')
+    mSolT = Motor('XPSGP:m8')
     mYbase = Motor('16IDB:m4')
 
     # define xps ip (if needed)
@@ -2848,6 +2859,9 @@ elif config.stack_choice.get() == 'GPHP':
         'XPS Cen Y': ['XPS', mY, 'FI1_Signal', 2.0],
         'XPS Sam Z': ['XPS', mZ, 'FI1_Signal', 2.0],
         'XPS Omega': ['XPS', mW, 'FI1_Signal', 20.0],
+        'GP Soller X': ['XPS', mSolX, 'FI1_Signal', 2.0],
+        'GP Soller Y': ['XPS', mSolY, 'FI1_Signal', 2.0],
+        'GP Soller T': ['XPS', mSolT, 'FI1_Signal', 10.0],
         'GP LKB Pinhole Y': ['MAXV', mLgPinY, 'FI7_Signal', 0.3],
         'GP LKB Pinhole Z': ['MAXV', mLgPinZ, 'FI8_Signal', 0.3],
         'GP SKB Pinhole Y': ['MAXV', mSmPinY, 'FI9_Signal', 0.3],
@@ -2863,6 +2877,9 @@ elif config.stack_choice.get() == 'GPHP':
     more_list = [
         'XPS Cen X',
         'XPS Omega',
+        'GP Soller X',
+        'GP Soller Y',
+        'GP Soller T',
         'GP LKB Pinhole Y',
         'GP LKB Pinhole Z',
         'GP SKB Pinhole Y',
