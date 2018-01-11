@@ -1,5 +1,6 @@
 from math import cos, sin, radians, pi, sqrt
 import ftplib
+import XPS_Q8_drivers
 
 r = 5.0
 w_i = 0.0
@@ -48,3 +49,12 @@ ramp_line[4] = '0.0000'
 temp_line = ','.join(ramp_line)
 complete_file += temp_line + '\n'
 print complete_file
+traj_file = open('circle_traj.trj', 'w')
+traj_file.write(complete_file)
+traj_file.close()
+session = ftplib.FTP('164.54.164.46', user='Administrator', passwd='Administrator')
+session.cwd('Public/Trajectories/')
+traj_file = open('circle_traj.trj')
+session.storlines('STOR circle_traj.trj', traj_file)
+traj_file.close()
+session.quit()
