@@ -3196,10 +3196,10 @@ elif config.stack_choice.get() == 'TEST':
     root.title('Diptera - A real program for scanning imaginary stages')
     # create objects including epics Motors, Struck, etc
     # define 5-motor sample stack
-    mX = Motor('16TEST1:m25')
-    mY = Motor('16TEST1:m26')
-    mZ = Motor('16TEST1:m27')
-    mW = Motor('XPSGP:m5')
+    mX = Motor('16HEXGP:m1')
+    mY = Motor('16HEXGP:m2')
+    mZ = Motor('16HEXGP:m3')
+    mW = Motor('16HEXGP:m6')
     mYbase = Motor('16IDB:m4')
 
     # define xps ip (if needed)
