@@ -60,7 +60,7 @@ def make_hex_fly(zero, min, max, velocity, motor, exp_time, num_pts):
                   'DWELL 0.3\n'
                   '\n'
                   'END PROGRAM\n')
-    textpath = 'S:\\Hexfly\\fs.ab'
+    textpath = 'S:\\Hexfly\\fs.pgm'
     textfile = open(textpath, 'w')
     textfile.write(prog_lines)
     textfile.close()
@@ -70,7 +70,7 @@ make_hex_fly(zero=fly_zero, min=abs_fly_min, max=abs_fly_max,
 
 edsIP = "164.54.164.194"
 edsPORT = 8000
-MESSAGE1='PROGRAM 1 LOAD "S:\\Hexfly\\fs.ab"\n'
+MESSAGE1='PROGRAM 1 LOAD "S:\\Hexfly\\fs.pgm"\n'
 MESSAGE2 = 'PROGRAM 1 START\n'
 
 srvsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
