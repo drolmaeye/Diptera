@@ -1,64 +1,101 @@
 import ftplib
 import urllib
 import os
+import socket
 
-cwd = os.getcwd()
-print cwd
-os.chdir('S:')
-cwd = os.getcwd()
-print cwd
-print 'you did it!'
-textpath = 'S:\\Hexfly\\fs.ab'
-print textpath
-textfile = open(textpath, 'w')
+# ###cwd = os.getcwd()
+# ###print cwd
+# ###os.chdir('S:')
+# ###cwd = os.getcwd()
+# ###print cwd
+# ###print 'you did it!'
+# ###textpath = 'S:\\Hexfly\\fs.ab'
+# ###print textpath
+# ###textfile = open(textpath, 'w')
+
+fly_zero = -0.0875
+abs_fly_min = -0.050
+abs_fly_max = 0.050
+temp_velo = 0.100
+mFly = 'X'
+exp_time = 0.020
+npts = 51
 
 
-prog_lines = ('\'--------------------------------------------\n'
-              '\'------------- HexSpliceDev.ab --------------\n'
-              '\'--------------------------------------------\n'
-              '\'\n'
-              '\'This program uses a few commands to move,\n'
-              '\'Trying to check V between moves, pulse added.\n'
-              '\n'
-              'PSOCONTROL ST1 RESET\n'
-              '\n'
-              'PSOOUTPUT ST1 CONTROL 0 1\n'
-              '\n'
-              'PSOPULSE ST1 TIME 20000, 1000 CYCLES 51\n'
-              '\n'
-              'PSOOUTPUT ST1 PULSE\n'
-              '\n'
-              'VELOCITY ON\n'
-              '\n'
-              'INCREMENTAL\n'
-              '\n'
-              'SCOPETRIG\n'
-              '\n'
-              'LINEAR X-0.0875 F1\n'
-              '\n'
-              'DWELL 0.3\n'
-              '\n'
-              'LINEAR X0.0375 F0.100\n'
-              '\n'
-              'PSOCONTROL ST1 FIRE\n'
-              '\n'
-              'LINEAR X0.100\n'
-              '\n'
-              'LINEAR X0.0375\n'
-              '\n'
-              'DWELL 0.5\n'
-              '\n'
-              'LINEAR X-0.0875 F1\n'
-              '\n'
-              'END PROGRAM\n')
+def make_hex_fly(zero, min, max, velocity, motor, exp_time, num_pts):
+    delta_ramp = str(min - zero)
+    delta_fly = str(max-min)
+    delta_t = str(int(exp_time*1000000))
+    cycles = str(num_pts)
+    fly_velo = str(velocity)
+    prog_lines = ('\'--------------------------------------------\n'
+                  '\'------------- HexSpliceDev.ab --------------\n'
+                  '\'--------------------------------------------\n'
+                  '\'\n'
+                  '\'This program uses a few commands to move,\n'
+                  '\'Trying to check V between moves, pulse added.\n'
+                  '\n'
+                  'PSOCONTROL ST1 RESET\n'
+                  '\n'
+                  'PSOOUTPUT ST1 CONTROL 0 1\n'
+                  '\n'
+                  'PSOPULSE ST1 TIME ' + delta_t + ', 1000 CYCLES ' + cycles + '\n'
+                  '\n'
+                  'PSOOUTPUT ST1 PULSE\n'
+                  '\n'
+                  'VELOCITY ON\n'
+                  '\n'
+                  'INCREMENTAL\n'
+                  '\n'
+                  'SCOPETRIG\n'
+                  '\n'
+                  'LINEAR ' + motor + delta_ramp + ' F' + fly_velo + '\n'
+                  '\n'
+                  'PSOCONTROL ST1 FIRE\n'
+                  '\n'
+                  'LINEAR ' + mFly + delta_fly + '\n'
+                  '\n'
+                  'LINEAR ' + mFly + delta_ramp + '\n'
+                  '\n'
+                  'DWELL 0.3\n'
+                  '\n'
+                  'END PROGRAM\n')
+    textpath = 'S:\\Hexfly\\fs.ab'
+    textfile = open(textpath, 'w')
+    textfile.write(prog_lines)
+    textfile.close()
 
-textfile.write(prog_lines)
+make_hex_fly(zero=fly_zero, min=abs_fly_min, max=abs_fly_max,
+             velocity=temp_velo, motor=mFly, exp_time=exp_time, num_pts=npts)
 
-textfile.close()
+edsIP = "164.54.164.194"
+edsPORT = 8000
+MESSAGE1='PROGRAM 1 LOAD "S:\\Hexfly\\fs.ab"\n'
+MESSAGE2 = 'PROGRAM 1 START\n'
+
+srvsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+srvsock.settimeout(3) # 3 second timeout on commands
+srvsock.connect((edsIP, edsPORT))
+srvsock.send(MESSAGE1)
+
+data = srvsock.recv(4096)
+print "received message:", data
+
+srvsock.send(MESSAGE2)
+
+data = srvsock.recv(4096)
+print "received message:", data
+
+
+
+
+
+
+
+print 'done'
+srvsock.close()
+
 print 'end'
-
-
-
 
 ### code below is for XPS, commented out 12 April 2018 for Hex development
 # ###session = ftplib.FTP('164.54.164.24', user='Administrator', passwd='Administrator')

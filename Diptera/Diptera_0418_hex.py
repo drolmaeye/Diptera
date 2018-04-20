@@ -21,6 +21,7 @@ from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 import ftplib
+import socket
 import XPS_Q8_drivers
 
 
@@ -733,11 +734,11 @@ class ScanActions:
             fly_zero = abs_fly_min - temp_velo * mW.ACCL * 1.5
             fly_final = abs_fly_max + temp_velo * mW.ACCL * 1.5
             # make trajectory and establish communication with A3200
-            # TODO next three lines
-            # make_hex_fly(zero=fly_zero, min=abs_fly_min, max=abs_fly_max, velo=temp_velo, motor=mFly)
-            # #make_trajectory(zero=fly_zero, min=abs_fly_min, max=abs_fly_max, velo=temp_velo, motor=mFly)
-            # #myxps = XPS_Q8_drivers.XPS()
-            # #socketId = myxps.TCP_ConnectToServer(xps_ip, 5001, 20)
+            exp_time = self.exp_time.get()
+            npts = fly_axis.npts.get()
+            make_hex_fly(zero=fly_zero, min=abs_fly_min, max=abs_fly_max, velocity=temp_velo,
+                         motor=mFly, exp_time=exp_time, num_pts=npts)
+
         # initialize core arrays of the proper dimension
         core.FLY = np.linspace(abs_fly_plot_min, abs_fly_plot_max, fly_axis.npts.get() - 1)
         core.STP = np.linspace(abs_step_plot_min, abs_step_plot_max, step_axis.npts.get())
@@ -884,8 +885,21 @@ class ScanActions:
                 # mFly.move(fly_final, wait=True)
             else:
                 # controller must be HEX
-                # TODO fly haxapod
-                pass
+                edsIP = "164.54.164.194"
+                edsPORT = 8000
+                MESSAGE1 = 'PROGRAM 1 LOAD "C:\Users\Public\Documents\Aerotech\A3200\User Files\DO_test.pgm"\n'
+                MESSAGE2 = 'PROGRAM 1 START\n'
+
+                srvsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                srvsock.settimeout(3)  # 3 second timeout on commands
+                srvsock.connect((edsIP, edsPORT))
+                srvsock.send(MESSAGE1)
+                response = srvsock.recv(4096)
+                print "received message:", response
+                srvsock.send(MESSAGE2)
+                response = srvsock.recv(4096)
+                print "received message:", response
+                srvsock.close()
             time.sleep(.25)
             if image.enable_flag.get():
                 while detector.Acquire:
@@ -2477,6 +2491,50 @@ def make_trajectory(zero, min, max, velo, motor):
     session.storlines('STOR traj.trj', traj_file)
     traj_file.close()
     session.quit()
+
+
+def make_hex_fly(zero, min, max, velocity, motor, exp_time, num_pts):
+    delta_ramp = str(min - zero)
+    delta_fly = str(max-min)
+    delta_t = str(int(exp_time*1000000))
+    cycles = str(num_pts)
+    fly_velo = str(velocity)
+    prog_lines = ('\'--------------------------------------------\n'
+                  '\'------------- HexSpliceDev.ab --------------\n'
+                  '\'--------------------------------------------\n'
+                  '\'\n'
+                  '\'This program uses a few commands to move,\n'
+                  '\'Trying to check V between moves, pulse added.\n'
+                  '\n'
+                  'PSOCONTROL ST1 RESET\n'
+                  '\n'
+                  'PSOOUTPUT ST1 CONTROL 0 1\n'
+                  '\n'
+                  'PSOPULSE ST1 TIME ' + delta_t + ', 1000 CYCLES ' + cycles + '\n'
+                  '\n'
+                  'PSOOUTPUT ST1 PULSE\n'
+                  '\n'
+                  'VELOCITY ON\n'
+                  '\n'
+                  'INCREMENTAL\n'
+                  '\n'
+                  'SCOPETRIG\n'
+                  '\n'
+                  'LINEAR ' + motor + delta_ramp + ' F' + fly_velo + '\n'
+                  '\n'
+                  'PSOCONTROL ST1 FIRE\n'
+                  '\n'
+                  'LINEAR ' + motor + delta_fly + '\n'
+                  '\n'
+                  'LINEAR ' + motor + delta_ramp + '\n'
+                  '\n'
+                  'DWELL 0.3\n'
+                  '\n'
+                  'END PROGRAM\n')
+    textpath = 'S:\\Hexfly\\fs.ab'
+    textfile = open(textpath, 'w')
+    textfile.write(prog_lines)
+    textfile.close()
 
 
 def update_plot(*args):
