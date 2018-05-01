@@ -2,6 +2,7 @@ import ftplib
 import urllib
 import os
 import socket
+import time
 
 # ###cwd = os.getcwd()
 # ###print cwd
@@ -20,6 +21,8 @@ temp_velo = 0.100
 mFly = 'X'
 exp_time = 0.020
 npts = 51
+# prog = 'fly'
+prog = 'dwell'
 
 
 def make_hex_fly(zero, min, max, velocity, motor, exp_time, num_pts):
@@ -65,32 +68,88 @@ def make_hex_fly(zero, min, max, velocity, motor, exp_time, num_pts):
     textfile.write(prog_lines)
     textfile.close()
 
-make_hex_fly(zero=fly_zero, min=abs_fly_min, max=abs_fly_max,
-             velocity=temp_velo, motor=mFly, exp_time=exp_time, num_pts=npts)
+
+def make_dwell():
+    prog_lines = ('\'--------------------------------------------\n'
+                  '\'------------- Dwell.ab --------------\n'
+                  '\'--------------------------------------------\n'
+                  '\'\n'
+                  'DWELL 1.0\n'
+                  '\n'
+                  'DWELL 1.0\n'
+                  '\n'
+                  'DWELL 1.0\n'
+                  '\n'
+                  'END PROGRAM\n')
+    textpath = 'S:\\Hexfly\\dwell.pgm'
+    textfile = open(textpath, 'w')
+    textfile.write(prog_lines)
+    textfile.close()
+
+
+if prog == 'fly':
+    make_hex_fly(zero=fly_zero, min=abs_fly_min, max=abs_fly_max,
+                 velocity=temp_velo, motor=mFly, exp_time=exp_time, num_pts=npts)
+    MESSAGE1 = 'PROGRAM 1 LOAD "S:\\Hexfly\\fs.pgm"\n'
+
+else:
+    make_dwell()
+    MESSAGE1 = 'PROGRAM 1 LOAD "S:\\Hexfly\\dwell.pgm"\n'
 
 edsIP = "164.54.164.194"
 edsPORT = 8000
-MESSAGE1='PROGRAM 1 LOAD "S:\\Hexfly\\fs.pgm"\n'
+# MESSAGE1='PROGRAM 1 LOAD "S:\\Hexfly\\fs.pgm"\n'
 MESSAGE2 = 'PROGRAM 1 START\n'
+MESSAGE3 = 'TASKSTATUS(1, DATAITEM_TaskState)\n'
 
 srvsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 srvsock.settimeout(3) # 3 second timeout on commands
 srvsock.connect((edsIP, edsPORT))
-srvsock.send(MESSAGE1)
 
+srvsock.send(MESSAGE1)
 data = srvsock.recv(4096)
 print "received message:", data
 
 srvsock.send(MESSAGE2)
-
 data = srvsock.recv(4096)
 print "received message:", data
 
 
+# ###for asks in range(20):
+# ###    srvsock.send(MESSAGE3)
+# ###    data = srvsock.recv(4096)
+# ###    print "received message:", data
+# ###    # if data == '%4\n':
+# ###    #     print 'run it'
+# ###    if data == '%7\n':
+# ###        print 'bawt it'
+# ###        break
+# ###    time.sleep(0.500)
 
+# program running check
+timeout = 4.0
+timeout_start = time.time()
+while time.time() < timeout_start + timeout:
+    srvsock.send(MESSAGE3)
+    data = srvsock.recv(4096)
+    if data == '%7\n':
+        print 'bawt it'
+        break
+    else:
+        time.sleep(0.250)
+        print "received message:", data
+else:
+    print 'timeout!!! Oh shoot!'
 
-
-
+# ###while not data == '%7\n':
+# ###    srvsock.send(MESSAGE3)
+# ###    data = srvsock.recv(4096)
+# ###    print "received message:", data
+# ###    # if data == '%4\n':
+# ###    #     print 'run it'
+# ###    time.sleep(0.25)
+# ###else:
+# ###    print 'bawt it'
 
 print 'done'
 srvsock.close()
