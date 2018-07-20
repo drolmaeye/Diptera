@@ -21,7 +21,6 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 import ftplib
 import XPS_Q8_drivers
-# import anything
 
 
 # define classes
