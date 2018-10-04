@@ -736,8 +736,18 @@ class ScanActions:
             # make trajectory and establish communication with A3200
             exp_time = self.exp_time.get()
             npts = fly_axis.npts.get()
+            if mFly == mX:
+                f_motor = 'X'
+            elif mFly == mY:
+                f_motor = 'Y'
+            elif mFly == mZ:
+                f_motor = 'Z'
+            elif mFly == mW:
+                f_motor = 'C'
+            else:
+                print 'cannot resolve mFly and f_motor'
             make_hex_fly(zero=fly_zero, min=abs_fly_min, max=abs_fly_max, velocity=temp_velo,
-                         motor=mFly, exp_time=exp_time, num_pts=npts)
+                         motor=f_motor, exp_time=exp_time, num_pts=npts)
 
         # initialize core arrays of the proper dimension
         core.FLY = np.linspace(abs_fly_plot_min, abs_fly_plot_max, fly_axis.npts.get() - 1)
@@ -887,7 +897,7 @@ class ScanActions:
                 # controller must be HEX
                 edsIP = "164.54.164.194"
                 edsPORT = 8000
-                MESSAGE1 = 'PROGRAM 1 LOAD "C:\Users\Public\Documents\Aerotech\A3200\User Files\DO_test.pgm"\n'
+                MESSAGE1 = 'PROGRAM 1 LOAD "S:\\Hexfly\\fs.pgm"\n'
                 MESSAGE2 = 'PROGRAM 1 START\n'
 
                 srvsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -900,7 +910,10 @@ class ScanActions:
                 response = srvsock.recv(4096)
                 print "received message:", response
                 srvsock.close()
-            time.sleep(.25)
+            hex_wait = fly_axis.npts.get()*scan.exp_time.get() + 2.0
+            print hex_wait
+            time.sleep(hex_wait)
+            print 'wait done'
             if image.enable_flag.get():
                 while detector.Acquire:
                     time.sleep(0.1)
@@ -2531,7 +2544,7 @@ def make_hex_fly(zero, min, max, velocity, motor, exp_time, num_pts):
                   'DWELL 0.3\n'
                   '\n'
                   'END PROGRAM\n')
-    textpath = 'S:\\Hexfly\\fs.ab'
+    textpath = 'S:\\Hexfly\\fs.pgm'
     textfile = open(textpath, 'w')
     textfile.write(prog_lines)
     textfile.close()
@@ -3199,11 +3212,11 @@ elif config.stack_choice.get() == 'TEST':
     mX = Motor('16HEXGP:m1')
     mY = Motor('16HEXGP:m2')
     mZ = Motor('16HEXGP:m3')
-    mW = Motor('16HEXGP:m6')
-    mYbase = Motor('16IDB:m4')
+    mW = Motor('XPSGP:m4')
+    mYbase = Motor('XPSGP:m5')
 
     # define xps ip (if needed)
-    # xps_ip = '164.54.164.xxx'
+    xps_ip = '164.54.164.24'
     # define hexapod ip
     hex_ip = '164.54.164.194'
 
@@ -3219,19 +3232,19 @@ elif config.stack_choice.get() == 'TEST':
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
     stage_dict = {
-        'Hex-X': ['HEX', mX, 'FI1_Signal', 2.0],
-        'Hex-Y': ['HEX', mY, 'FI1_Signal', 2.0],
-        'Hex-Z': ['HEX', mZ, 'FI1_Signal', 2.0],
-        'GP Omega': ['MAXV', mW, 'F4_Signal', 20.0]}
+        'GP Hex X': ['HEX', mX, 'FI2_Signal', 2.0],
+        'GP Hex Y': ['HEX', mY, 'FI2_Signal', 2.0],
+        'GP Hex Z': ['HEX', mZ, 'FI2_Signal', 2.0],
+        'GP Large W': ['XPS', mW, 'FI3_Signal', 10.0]}
 
     # create lists for drop-down menus
-    fly_list = ['Hex-Y', 'Hex-Z', 'More']
-    step_list = ['Hex-Y', 'Hex-Z', 'More', 'Custom']
+    fly_list = ['GP Hex Y', 'GP Hex Z', 'More']
+    step_list = ['GP Hex Y', 'GP Hex Z', 'More', 'Custom']
 
     # more list should contain all fly motors not included in fly_list
     more_list = [
-        'Hex-X',
-        'GP Omega']
+        'GP Hex X',
+        'GP Large W']
 
     # counter list same for all endstations
     counter_list = [

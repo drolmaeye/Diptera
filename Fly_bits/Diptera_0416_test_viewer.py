@@ -11,7 +11,7 @@ import numpy as np
 from math import cos, sin, radians, pi, sqrt
 from scipy import exp, integrate
 from scipy.optimize import curve_fit
-import fabio
+## import fabio
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 # from matplotlib.patches import Circle
