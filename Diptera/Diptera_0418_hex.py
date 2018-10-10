@@ -675,7 +675,6 @@ class ScanActions:
             fly_final = abs_fly_max + accl_distance
             # accl_plus_fly_steps = (abs_fly_max - fly_zero)/resolution
         elif controller == 'XPS':
-            # controller must be XPS (for now)
             temp_velo = fly_axis.step_size.get()/self.exp_time.get()
             # ### 8 Dec 2016 for XPS this will be handled by a direct command to XPS ***
             # temp_velo check
@@ -899,7 +898,7 @@ class ScanActions:
                 edsPORT = 8000
                 MESSAGE1 = 'PROGRAM 1 LOAD "S:\\Hexfly\\fs.pgm"\n'
                 MESSAGE2 = 'PROGRAM 1 START\n'
-
+                MESSAGE3 = 'TASKSTATUS(1, DATAITEM_TaskState)\n'
                 srvsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 srvsock.settimeout(3)  # 3 second timeout on commands
                 srvsock.connect((edsIP, edsPORT))
@@ -909,11 +908,25 @@ class ScanActions:
                 srvsock.send(MESSAGE2)
                 response = srvsock.recv(4096)
                 print "received message:", response
+                # ###srvsock.close()
+                # ###hex_wait = fly_axis.npts.get()*scan.exp_time.get() + 4.0
+                # ###print hex_wait
+                # ###time.sleep(hex_wait)
+                timeout = fly_axis.npts.get()*scan.exp_time.get() + 4.0
+                timeout_start = time.time()
+                while time.time() < timeout_start + timeout:
+                    srvsock.send(MESSAGE3)
+                    response = srvsock.recv(4096)
+                    if response == '%7\n':
+                        print response, 'bawt it'
+                        break
+                    else:
+                        time.sleep(0.250)
+                        print "received message:", response
+                else:
+                    print 'timeout!!! Oh shoot!'
+                print 'wait done'
                 srvsock.close()
-            hex_wait = fly_axis.npts.get()*scan.exp_time.get() + 2.0
-            print hex_wait
-            time.sleep(hex_wait)
-            print 'wait done'
             if image.enable_flag.get():
                 while detector.Acquire:
                     time.sleep(0.1)
@@ -3215,9 +3228,9 @@ elif config.stack_choice.get() == 'TEST':
     mW = Motor('XPSGP:m4')
     mYbase = Motor('XPSGP:m5')
 
-    # define xps ip (if needed)
+    # define xps ip (as needed)
     xps_ip = '164.54.164.24'
-    # define hexapod ip
+    # define hexapod ip (as needed)
     hex_ip = '164.54.164.194'
 
     # define any additional flyscan motors
@@ -3253,6 +3266,56 @@ elif config.stack_choice.get() == 'TEST':
         'Hutch reference',
         'FOE ion chamber',
         '50 MHz clock']
+
+
+# ###elif config.stack_choice.get() == 'TEST':
+# ###    root.title('Diptera - A real program for scanning imaginary stages')
+# ###    # create objects including epics Motors, Struck, etc
+# ###    # define 5-motor sample stack
+# ###    mX = Motor('XPSGP:m1')
+# ###    mY = Motor('XPSGP:m2')
+# ###    mZ = Motor('16HEXGP:m3')
+# ###    mW = Motor('XPSGP:m3')
+# ###    mYbase = Motor('XPSGP:m5')
+# ###
+# ###    # define xps ip (if needed)
+# ###    xps_ip = '164.54.164.24'
+# ###    # define hexapod ip
+# ###    hex_ip = '164.54.164.194'
+# ###
+# ###    # define any additional flyscan motors
+# ###    # none
+# ###
+# ###    # define struck, softGlue, SG_Config, and abort PV
+# ###    mcs = Struck('16TEST1:SIS1:')
+# ###    softglue = Device('16TEST1:softGlue:', softglue_args)
+# ###    sg_config = Device('16TEST1:SGMenu:', sg_config_args)
+# ###    abort = PV('16TEST1:Unidig1Bo1')
+# ###
+# ###    # create dictionary for valid flyscan motors
+# ###    # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
+# ###    stage_dict = {
+# ###        'GP Small X': ['XPS', mX, 'FI3_Signal', 2.0],
+# ###        'GP Small Y': ['XPS', mY, 'FI3_Signal', 2.0],
+# ###        'GP Hex Z': ['HEX', mZ, 'FI2_Signal', 2.0],
+# ###        'GP Small W': ['XPS', mW, 'FI3_Signal', 10.0]}
+# ###
+# ###    # create lists for drop-down menus
+# ###    fly_list = ['GP Small Y', 'GP Hex Z', 'More']
+# ###    step_list = ['GP Small Y', 'GP Hex Z', 'More', 'Custom']
+# ###
+# ###    # more list should contain all fly motors not included in fly_list
+# ###    more_list = [
+# ###        'GP Small X',
+# ###        'GP Small W']
+# ###
+# ###    # counter list same for all endstations
+# ###    counter_list = [
+# ###        'Beamstop diode',
+# ###        'Removable diode',
+# ###        'Hutch reference',
+# ###        'FOE ion chamber',
+# ###        '50 MHz clock']
 
 # Primary frames for displaying objects
 framePlot = Frame(root)

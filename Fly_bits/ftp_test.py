@@ -133,7 +133,7 @@ while time.time() < timeout_start + timeout:
     srvsock.send(MESSAGE3)
     data = srvsock.recv(4096)
     if data == '%7\n':
-        print 'bawt it'
+        print data, 'bawt it'
         break
     else:
         time.sleep(0.250)
