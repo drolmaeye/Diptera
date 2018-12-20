@@ -2492,11 +2492,11 @@ def make_trajectory(zero, min, max, velo, motor):
     else:
         # must be w, pick correct one
         if config.stack_choice.get() == 'GPHP':
+            xi = 5
+            vi = 6
+        else:
             xi = 7
             vi = 8
-        else:
-            xi = 9
-            vi = 10
     line_a[xi] = str(delta_xac)
     line_a[vi] = str(velo_ab)
     line_b[0] = str(delta_tb)
