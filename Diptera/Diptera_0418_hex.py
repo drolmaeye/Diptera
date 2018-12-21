@@ -3173,72 +3173,21 @@ elif config.stack_choice.get() == 'IDD':
         'FOE ion chamber',
         '50 MHz clock']
 
-# ###elif config.stack_choice.get() == 'TEST':
-# ###    root.title('Diptera - A real program for scanning imaginary stages')
-# ###    # create objects including epics Motors, Struck, etc
-# ###    # define 5-motor sample stack
-# ###    mX = Motor('16TEST1:m10')
-# ###    mY = Motor('16TEST1:m9')
-# ###    mZ = Motor('16TEST1:m11')
-# ###    mW = Motor('16TEST1:m12')
-# ###    mYbase = Motor('16TEST1:m13')
-# ###
-# ###    # define xps ip (if needed)
-# ###    # xps_ip = '164.54.164.xxx'
-# ###
-# ###    # define any additional flyscan motors
-# ###    mT = Motor('16TEST1:m14')
-# ###
-# ###    # define struck, softGlue, SG_Config, and abort PV
-# ###    mcs = Struck('16TEST1:SIS1:')
-# ###    softglue = Device('16TEST1:softGlue:', softglue_args)
-# ###    sg_config = Device('16TEST1:SGMenu:', sg_config_args)
-# ###    abort = PV('16TEST1:Unidig1Bo1')
-# ###
-# ###    # create dictionary for valid flyscan motors
-# ###    # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
-# ###    stage_dict = {
-# ###        'TEST X': ['MAXV', mX, 'FI3_Signal', 2.0],
-# ###        'TEST Y': ['MAXV', mY, 'FI4_Signal', 2.0],
-# ###        'TEST Z': ['MAXV', mZ, 'FI5_Signal', 2.0],
-# ###        'M12': ['MAXV', mW, 'FI6_Signal', 20.0],
-# ###        'M14': ['MAXV', mT, 'FI7_Signal', 1.0]}
-# ###
-# ###    # create lists for drop-down menus
-# ###    fly_list = ['TEST Y', 'TEST Z', 'More']
-# ###    step_list = ['TEST Y', 'TEST Z', 'More', 'Custom']
-# ###
-# ###    # more list should contain all fly motors not included in fly_list
-# ###    more_list = [
-# ###        'TEST X',
-# ###        'TEST W',
-# ###        'M14']
-# ###
-# ###    # counter list same for all endstations
-# ###    counter_list = [
-# ###        'Beamstop diode',
-# ###        'Removable diode',
-# ###        'Hutch reference',
-# ###        'FOE ion chamber',
-# ###        '50 MHz clock']
-
 elif config.stack_choice.get() == 'TEST':
     root.title('Diptera - A real program for scanning imaginary stages')
     # create objects including epics Motors, Struck, etc
     # define 5-motor sample stack
-    mX = Motor('16HEXGP:m1')
-    mY = Motor('16HEXGP:m2')
-    mZ = Motor('16HEXGP:m3')
-    mW = Motor('XPSGP:m4')
-    mYbase = Motor('XPSGP:m5')
+    mX = Motor('16TEST1:m10')
+    mY = Motor('16TEST1:m9')
+    mZ = Motor('16TEST1:m11')
+    mW = Motor('16TEST1:m12')
+    mYbase = Motor('16TEST1:m13')
 
-    # define xps ip (as needed)
-    xps_ip = '164.54.164.24'
-    # define hexapod ip (as needed)
-    hex_ip = '164.54.164.194'
+    # define xps ip (if needed)
+    # xps_ip = '164.54.164.xxx'
 
     # define any additional flyscan motors
-    # none
+    mT = Motor('16TEST1:m14')
 
     # define struck, softGlue, SG_Config, and abort PV
     mcs = Struck('16TEST1:SIS1:')
@@ -3249,19 +3198,21 @@ elif config.stack_choice.get() == 'TEST':
     # create dictionary for valid flyscan motors
     # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
     stage_dict = {
-        'GP Hex X': ['HEX', mX, 'FI2_Signal', 2.0],
-        'GP Hex Y': ['HEX', mY, 'FI2_Signal', 2.0],
-        'GP Hex Z': ['HEX', mZ, 'FI2_Signal', 2.0],
-        'GP Large W': ['XPS', mW, 'FI3_Signal', 10.0]}
+        'TEST X': ['MAXV', mX, 'FI3_Signal', 2.0],
+        'TEST Y': ['MAXV', mY, 'FI4_Signal', 2.0],
+        'TEST Z': ['MAXV', mZ, 'FI5_Signal', 2.0],
+        'M12': ['MAXV', mW, 'FI6_Signal', 20.0],
+        'M14': ['MAXV', mT, 'FI7_Signal', 1.0]}
 
     # create lists for drop-down menus
-    fly_list = ['GP Hex Y', 'GP Hex Z', 'More']
-    step_list = ['GP Hex Y', 'GP Hex Z', 'More', 'Custom']
+    fly_list = ['TEST Y', 'TEST Z', 'More']
+    step_list = ['TEST Y', 'TEST Z', 'More', 'Custom']
 
     # more list should contain all fly motors not included in fly_list
     more_list = [
-        'GP Hex X',
-        'GP Large W']
+        'TEST X',
+        'TEST W',
+        'M14']
 
     # counter list same for all endstations
     counter_list = [
@@ -3270,56 +3221,6 @@ elif config.stack_choice.get() == 'TEST':
         'Hutch reference',
         'FOE ion chamber',
         '50 MHz clock']
-
-
-# ###elif config.stack_choice.get() == 'TEST':
-# ###    root.title('Diptera - A real program for scanning imaginary stages')
-# ###    # create objects including epics Motors, Struck, etc
-# ###    # define 5-motor sample stack
-# ###    mX = Motor('XPSGP:m1')
-# ###    mY = Motor('XPSGP:m2')
-# ###    mZ = Motor('16HEXGP:m3')
-# ###    mW = Motor('XPSGP:m3')
-# ###    mYbase = Motor('XPSGP:m5')
-# ###
-# ###    # define xps ip (if needed)
-# ###    xps_ip = '164.54.164.24'
-# ###    # define hexapod ip
-# ###    hex_ip = '164.54.164.194'
-# ###
-# ###    # define any additional flyscan motors
-# ###    # none
-# ###
-# ###    # define struck, softGlue, SG_Config, and abort PV
-# ###    mcs = Struck('16TEST1:SIS1:')
-# ###    softglue = Device('16TEST1:softGlue:', softglue_args)
-# ###    sg_config = Device('16TEST1:SGMenu:', sg_config_args)
-# ###    abort = PV('16TEST1:Unidig1Bo1')
-# ###
-# ###    # create dictionary for valid flyscan motors
-# ###    # 'NAME': [controller, designation, softGlue, VMAX (in egu/s)]
-# ###    stage_dict = {
-# ###        'GP Small X': ['XPS', mX, 'FI3_Signal', 2.0],
-# ###        'GP Small Y': ['XPS', mY, 'FI3_Signal', 2.0],
-# ###        'GP Hex Z': ['HEX', mZ, 'FI2_Signal', 2.0],
-# ###        'GP Small W': ['XPS', mW, 'FI3_Signal', 10.0]}
-# ###
-# ###    # create lists for drop-down menus
-# ###    fly_list = ['GP Small Y', 'GP Hex Z', 'More']
-# ###    step_list = ['GP Small Y', 'GP Hex Z', 'More', 'Custom']
-# ###
-# ###    # more list should contain all fly motors not included in fly_list
-# ###    more_list = [
-# ###        'GP Small X',
-# ###        'GP Small W']
-# ###
-# ###    # counter list same for all endstations
-# ###    counter_list = [
-# ###        'Beamstop diode',
-# ###        'Removable diode',
-# ###        'Hutch reference',
-# ###        'FOE ion chamber',
-# ###        '50 MHz clock']
 
 # Primary frames for displaying objects
 framePlot = Frame(root)
