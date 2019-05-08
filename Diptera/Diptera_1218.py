@@ -895,7 +895,7 @@ class ScanActions:
                 # mFly.move(fly_final, wait=True)
             else:
                 # controller must be HEX
-                edsIP = "164.54.164.194"
+                edsIP = "164.54.105.199"
                 edsPORT = 8000
                 MESSAGE1 = 'PROGRAM 1 LOAD "S:\\Hexfly\\fs.pgm"\n'
                 MESSAGE2 = 'PROGRAM 1 START\n'
@@ -2846,7 +2846,7 @@ elif config.stack_choice.get() == 'BMB':
     mYbase = Motor('XPSBMB:m5')
 
     # define xps ip (if needed)
-    xps_ip = '164.54.164.117'
+    xps_ip = '164.54.105.117'
 
     # define any additional flyscan motors
     mPinY = Motor('16BMA:m30')
@@ -2955,9 +2955,9 @@ elif config.stack_choice.get() == 'GPHP':
     mYbase = Motor('XPSGP:m5')
 
     # define xps ip (as needed)
-    xps_ip = '164.54.164.24'
+    xps_ip = '164.54.105.24'
     # define hexapod ip (as needed)
-    hex_ip = '164.54.164.194'
+    hex_ip = '164.54.105.199'
 
     # define any additional flyscan motors
     mLgPinY = Motor('16IDB:m19')
@@ -3021,9 +3021,9 @@ elif config.stack_choice.get() == 'GPHL':
     mYbase = Motor('XPSGP:m5')
 
     # define xps ip (as needed)
-    xps_ip = '164.54.164.24'
+    xps_ip = '164.54.105.24'
     # define hexapod ip (as needed)
-    hex_ip = '164.54.164.194'
+    hex_ip = '164.54.105.199'
 
     # define any additional flyscan motors
     mLgPinY = Motor('16IDB:m19')
@@ -3090,9 +3090,9 @@ elif config.stack_choice.get() == 'GPSS':
     mYbase = Motor('XPSGP:m5')
 
     # define xps ip (as needed)
-    xps_ip = '164.54.164.24'
+    xps_ip = '164.54.105.24'
     # define hexapod ip (as needed)
-    hex_ip = '164.54.164.194'
+    hex_ip = '164.54.105.199'
 
     # define any additional flyscan motors
     mLgPinY = Motor('16IDB:m19')
@@ -3162,7 +3162,7 @@ elif config.stack_choice.get() == 'IDBLH':
     mYbase = Motor('16IDB:m10')
 
     # define xps ip (if needed)
-    xps_ip = '164.54.164.104'
+    xps_ip = '164.54.105.104'
 
     # define any additional flyscan motors
     mLgPinY = Motor('16IDB:m62')
