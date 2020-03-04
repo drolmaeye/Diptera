@@ -2,9 +2,9 @@ from math import cos, sin, radians, pi, sqrt
 import ftplib
 import XPS_Q8_drivers
 
-r = 0.010
+r = 3.000
 w_i = 0.0
-t_total = 4.0
+t_total = 5.0
 t_delta = t_total/36
 w_dot = 2*pi/t_total
 
